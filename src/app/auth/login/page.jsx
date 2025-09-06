@@ -68,44 +68,18 @@ export default function LoginForm() {
                     {/* Header */}
                     <div className="p-6 pb-4 text-center">
                         <h1 className="text-xl font-semibold text-gray-900">Welcome back</h1>
-                        <p className="mt-2 text-sm text-gray-600">Login with your Github or Google account</p>
+                        <p className="mt-2 text-sm text-gray-600">Login with your Google account</p>
                     </div>
 
                     {/* Content */}
                     <div className="p-6 pt-0">
                         {/* Tab Navigation */}
-                        <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab("patient")}
-                                className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${activeTab === "patient" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
-                                    }`}
-                            >
-                                Patient Login
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab("doctor")}
-                                className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${activeTab === "doctor" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
-                                    }`}
-                            >
-                                Doctor Login
-                            </button>
-                        </div>
+
 
                         {/* Social Login Buttons */}
                         <div className="space-y-6">
                             <div className="flex flex-col gap-4">
-                                <button
-                                    type="button"
-                                    onClick={() => router.push("/api/auth/github/redirect")}
-                                    className="flex w-full items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
-                                >
-                                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.387.6.113.82-.26.82-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.385-1.333-1.754-1.333-1.754-1.09-.745.083-.73.083-.73 1.205.084 1.84 1.236 1.84 1.236 1.07 1.834 2.807 1.304 3.492.997.108-.776.418-1.305.76-1.604-2.665-.3-5.466-1.332-5.466-5.932 0-1.31.468-2.38 1.236-3.22-.124-.302-.536-1.52.116-3.176 0 0 1.008-.322 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.552 3.296-1.23 3.296-1.23.653 1.656.242 2.874.118 3.176.77.84 1.235 1.91 1.235 3.22 0 4.61-2.805 5.63-5.476 5.922.43.372.823 1.1.823 2.22v3.293c0 .32.218.694.825.576C20.565 21.796 24 17.298 24 12c0-6.63-5.373-12-12-12z" />
-                                    </svg>
-                                    Login with Github
-                                </button>
+
                                 <button
                                     type="button"
                                     onClick={() => router.push("/api/auth/google/redirect")}

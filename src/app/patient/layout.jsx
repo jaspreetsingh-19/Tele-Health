@@ -49,7 +49,7 @@ const getNavigationItems = () => [
     },
     {
         title: "Video Consultation",
-        url: "/patient/consultation",
+        url: "/patient/videoCallDoc",
         icon: Video,
         description: "Join video calls with doctors",
     },
@@ -210,30 +210,7 @@ export default function DashboardLayout({ children }) {
                         {/* Sidebar Content */}
                         <div className="flex-1 overflow-auto p-4">
                             <div className="space-y-6">
-                                {/* Quick Actions Card */}
-                                <div className="bg-gradient-to-br from-blue-50 to-green-50 dark:from-blue-900/20 dark:to-green-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <Video className="h-4 w-4 text-blue-600" />
-                                        <span className="text-sm font-medium text-blue-900 dark:text-blue-100">Quick Actions</span>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Button
-                                            size="sm"
-                                            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                                            onClick={() => router.push("/patient/doctors")}
-                                        >
-                                            Book Appointment
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="w-full bg-transparent"
-                                            onClick={() => router.push("/patient/consultation")}
-                                        >
-                                            Join Video Call
-                                        </Button>
-                                    </div>
-                                </div>
+
 
                                 {/* Navigation Section */}
                                 <div>

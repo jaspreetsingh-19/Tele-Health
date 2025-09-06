@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { toast } from "sonner"
 import { useRouter } from 'next/navigation'
 
 export default function PatientAppointmentsPage() {
@@ -44,6 +45,7 @@ export default function PatientAppointmentsPage() {
             }
         } catch (error) {
             console.error('Error fetching appointments:', error)
+            toast.error("Failed to fetch appointments")
         } finally {
             setLoading(false)
         }
@@ -51,17 +53,41 @@ export default function PatientAppointmentsPage() {
 
     const cancelAppointment = async (appointmentId) => {
         try {
-            const response = await fetch(`/api/appointments/${appointmentId}`, {
-                method: 'DELETE'
-            })
+            const appointment = appointments.find(apt => apt._id === appointmentId)
+            let response;
 
-            if (response.ok) {
-                fetchAppointments()
+            if (appointment.paymentStatus === "paid") {
+                // Call refund route
+                response = await fetch(`/api/payments/refund`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        appointmentId: appointment._id,
+                        reason: "User cancelled",
+                    }),
+                });
+            } else {
+                // Call simple delete route
+                response = await fetch(`/api/appointments/${appointment._id}`, {
+                    method: "DELETE",
+                });
+            }
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                toast.success("Appointment cancelled successfully")
+                fetchAppointments();
+            } else {
+                toast.error(data.message || "Failed to cancel appointment")
             }
         } catch (error) {
-            console.error('Error cancelling appointment:', error)
+            console.error("Error cancelling appointment:", error);
+            toast.error("Something went wrong")
         }
-    }
+    };
 
     // Fixed date comparison functions
     const getTodayAppointments = () => {
@@ -86,9 +112,11 @@ export default function PatientAppointmentsPage() {
     }
 
     const navigateToChat = (appointmentId) => {
-        // Store appointment ID for chat component
-        localStorage.setItem('selectedAppointmentId', appointmentId)
-        router.push(`/patient/chat?appointmentId=${appointmentId}`)
+        router.push(`/patient/chatWithDoc?appointmentId=${appointmentId}`)
+    }
+
+    const navigateToVideoCall = (appointmentId) => {
+        router.push(`/patient/videoCallDoc?appointmentId=${appointmentId}`)
     }
 
     useEffect(() => {
@@ -99,33 +127,33 @@ export default function PatientAppointmentsPage() {
     const upcomingAppointments = getUpcomingAppointments()
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6 p-3 sm:p-0">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold text-foreground">My Appointments</h1>
-                    <p className="text-muted-foreground">View and manage your healthcare appointments</p>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-foreground">My Appointments</h1>
+                    <p className="text-muted-foreground text-sm sm:text-base">View and manage your healthcare appointments</p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <Badge className="bg-primary text-primary-foreground">{todayAppointments.length} Today</Badge>
-                    <Badge className="bg-accent text-accent-foreground">{upcomingAppointments.length} Upcoming</Badge>
+                <div className="flex items-center gap-2 sm:gap-3">
+                    <Badge className="bg-primary text-primary-foreground text-xs sm:text-sm">{todayAppointments.length} Today</Badge>
+                    <Badge className="bg-accent text-accent-foreground text-xs sm:text-sm">{upcomingAppointments.length} Upcoming</Badge>
                 </div>
             </div>
 
             {/* Filters */}
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Filter className="h-5 w-5 text-primary" />
+                    <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                        <Filter className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                         Filters
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                         <div className="space-y-2">
-                            <Label>Status</Label>
+                            <Label className="text-sm">Status</Label>
                             <Select value={filter.status} onValueChange={(value) => setFilter({ ...filter, status: value })}>
-                                <SelectTrigger>
+                                <SelectTrigger className="text-sm">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -139,12 +167,12 @@ export default function PatientAppointmentsPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <Label>Consultation Type</Label>
+                            <Label className="text-sm">Consultation Type</Label>
                             <Select
                                 value={filter.consultationType}
                                 onValueChange={(value) => setFilter({ ...filter, consultationType: value })}
                             >
-                                <SelectTrigger>
+                                <SelectTrigger className="text-sm">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -156,15 +184,20 @@ export default function PatientAppointmentsPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <Label>Date</Label>
-                            <Input type="date" value={filter.date} onChange={(e) => setFilter({ ...filter, date: e.target.value })} />
+                            <Label className="text-sm">Date</Label>
+                            <Input
+                                type="date"
+                                value={filter.date}
+                                onChange={(e) => setFilter({ ...filter, date: e.target.value })}
+                                className="text-sm"
+                            />
                         </div>
 
                         <div className="flex items-end">
                             <Button
                                 variant="outline"
                                 onClick={() => setFilter({ status: "all", date: "", consultationType: "all" })}
-                                className="w-full"
+                                className="w-full text-sm"
                             >
                                 Clear Filters
                             </Button>
@@ -173,18 +206,18 @@ export default function PatientAppointmentsPage() {
                 </CardContent>
             </Card>
 
-            <Tabs defaultValue="today" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="today">Today's Appointments</TabsTrigger>
-                    <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-                    <TabsTrigger value="all">All Appointments</TabsTrigger>
+            <Tabs defaultValue="today" className="space-y-4 sm:space-y-6">
+                <TabsList className="grid w-full grid-cols-3 h-auto">
+                    <TabsTrigger value="today" className="text-xs sm:text-sm">Today's</TabsTrigger>
+                    <TabsTrigger value="upcoming" className="text-xs sm:text-sm">Upcoming</TabsTrigger>
+                    <TabsTrigger value="all" className="text-xs sm:text-sm">All</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="today">
                     <div className="space-y-4">
                         {loading ? (
                             <div className="flex items-center justify-center py-8">
-                                <div className="text-muted-foreground">Loading appointments...</div>
+                                <div className="text-muted-foreground text-sm">Loading appointments...</div>
                             </div>
                         ) : todayAppointments.length === 0 ? (
                             <Card>
@@ -192,7 +225,7 @@ export default function PatientAppointmentsPage() {
                                     <div className="text-center">
                                         <Calendar className="mx-auto h-12 w-12 text-muted-foreground" />
                                         <h3 className="mt-4 text-lg font-medium">No appointments today</h3>
-                                        <p className="text-muted-foreground">You have no scheduled appointments for today.</p>
+                                        <p className="text-muted-foreground text-sm">You have no scheduled appointments for today.</p>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -203,6 +236,7 @@ export default function PatientAppointmentsPage() {
                                     appointment={appointment}
                                     onCancel={cancelAppointment}
                                     onNavigateToChat={navigateToChat}
+                                    onNavigateToVideoCall={navigateToVideoCall}
                                 />
                             ))
                         )}
@@ -217,7 +251,7 @@ export default function PatientAppointmentsPage() {
                                     <div className="text-center">
                                         <Clock className="mx-auto h-12 w-12 text-muted-foreground" />
                                         <h3 className="mt-4 text-lg font-medium">No upcoming appointments</h3>
-                                        <p className="text-muted-foreground">You have no scheduled upcoming appointments.</p>
+                                        <p className="text-muted-foreground text-sm">You have no scheduled upcoming appointments.</p>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -228,6 +262,7 @@ export default function PatientAppointmentsPage() {
                                     appointment={appointment}
                                     onCancel={cancelAppointment}
                                     onNavigateToChat={navigateToChat}
+                                    onNavigateToVideoCall={navigateToVideoCall}
                                 />
                             ))
                         )}
@@ -242,7 +277,7 @@ export default function PatientAppointmentsPage() {
                                     <div className="text-center">
                                         <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
                                         <h3 className="mt-4 text-lg font-medium">No appointments found</h3>
-                                        <p className="text-muted-foreground">No appointments match your current filters.</p>
+                                        <p className="text-muted-foreground text-sm">No appointments match your current filters.</p>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -253,6 +288,7 @@ export default function PatientAppointmentsPage() {
                                     appointment={appointment}
                                     onCancel={cancelAppointment}
                                     onNavigateToChat={navigateToChat}
+                                    onNavigateToVideoCall={navigateToVideoCall}
                                 />
                             ))
                         )}
@@ -263,7 +299,7 @@ export default function PatientAppointmentsPage() {
     )
 }
 
-function PatientAppointmentCard({ appointment, onCancel, onNavigateToChat }) {
+function PatientAppointmentCard({ appointment, onCancel, onNavigateToChat, onNavigateToVideoCall }) {
     const [copiedRoomId, setCopiedRoomId] = useState(false)
 
     // Fixed date formatting function
@@ -319,8 +355,10 @@ function PatientAppointmentCard({ appointment, onCancel, onNavigateToChat }) {
             await navigator.clipboard.writeText(appointment.roomId)
             setCopiedRoomId(true)
             setTimeout(() => setCopiedRoomId(false), 2000)
+            toast.success("Room ID copied to clipboard")
         } catch (err) {
             console.error('Failed to copy room ID:', err)
+            toast.error("Failed to copy room ID")
         }
     }
 
@@ -342,69 +380,71 @@ function PatientAppointmentCard({ appointment, onCancel, onNavigateToChat }) {
 
     return (
         <Card className="hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-                <div className="flex items-start justify-between">
+            <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="flex-1 space-y-3">
-                        <div className="flex items-center gap-4">
-                            <Avatar className="h-12 w-12">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                            <Avatar className="h-10 w-10 sm:h-12 sm:w-12 self-start sm:self-center">
                                 <AvatarImage src={appointment.doctorId?.avatar || "/placeholder.svg"} />
-                                <AvatarFallback className="bg-primary text-primary-foreground">
+                                <AvatarFallback className="bg-primary text-primary-foreground text-sm">
                                     {appointment.doctorId?.doctorProfile?.fullName?.charAt(0) ||
                                         appointment.doctorId?.username?.charAt(0)}
                                 </AvatarFallback>
                             </Avatar>
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-3">
-                                    <span className="font-medium">
+                            <div className="space-y-2 min-w-0 flex-1">
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                                    <span className="font-medium text-sm sm:text-base">
                                         Dr. {appointment.doctorId?.doctorProfile?.fullName || appointment.doctorId?.username}
                                     </span>
-                                    <Badge className={getStatusColor(appointment.status)}>{appointment.status}</Badge>
-                                    <Badge className={getPaymentStatusColor(appointment.paymentStatus)}>
-                                        {appointment.paymentStatus}
-                                    </Badge>
+                                    <div className="flex gap-2 flex-wrap">
+                                        <Badge className={`${getStatusColor(appointment.status)} text-xs`}>{appointment.status}</Badge>
+                                        <Badge className={`${getPaymentStatusColor(appointment.paymentStatus)} text-xs`}>
+                                            {appointment.paymentStatus}
+                                        </Badge>
+                                    </div>
                                 </div>
-                                <p className="text-sm text-muted-foreground">
+                                <p className="text-xs sm:text-sm text-muted-foreground">
                                     {appointment.doctorId?.doctorProfile?.specialization?.join(", ")}
                                 </p>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <Calendar className="h-4 w-4" />
-                                {formatDate(appointment.appointmentDate)}
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                            <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                                <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                <span className="truncate">{formatDate(appointment.appointmentDate)}</span>
                             </div>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <Clock className="h-4 w-4" />
-                                {formatTime(appointment.timeSlot.startTime)} - {formatTime(appointment.timeSlot.endTime)}
+                            <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                                <Clock className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                <span>{formatTime(appointment.timeSlot.startTime)} - {formatTime(appointment.timeSlot.endTime)}</span>
                             </div>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
                                 {appointment.consultationType === "video" ? (
-                                    <Video className="h-4 w-4" />
+                                    <Video className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                                 ) : (
-                                    <MessageCircle className="h-4 w-4" />
+                                    <MessageCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                                 )}
-                                {appointment.consultationType === "video" ? "Video Call" : "Chat"}
+                                <span>{appointment.consultationType === "video" ? "Video Call" : "Chat"}</span>
                             </div>
                         </div>
 
-                        <div className="text-sm">
+                        <div className="text-xs sm:text-sm">
                             <span className="font-medium">Symptoms: </span>
                             <span className="text-muted-foreground">{appointment.symptoms}</span>
                         </div>
 
-                        <div className="text-sm">
+                        <div className="text-xs sm:text-sm">
                             <span className="font-medium">Fee: </span>
                             <span className="text-muted-foreground">₹{appointment.consultationFee}</span>
                         </div>
 
                         {/* Room ID Block for Video Consultations */}
                         {appointment.consultationType === "video" && appointment.roomId && (
-                            <div className="bg-muted/50 rounded-lg p-3 border">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <span className="text-sm font-medium">Meeting Room ID:</span>
-                                        <div className="text-sm text-muted-foreground font-mono mt-1">
+                            <div className="bg-muted/50 rounded-lg p-2 sm:p-3 border w-full">
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                    <div className="min-w-0 flex-1">
+                                        <span className="text-xs sm:text-sm font-medium">Meeting Room ID:</span>
+                                        <div className="text-xs text-muted-foreground font-mono mt-1 break-all">
                                             {appointment.roomId}
                                         </div>
                                     </div>
@@ -412,12 +452,12 @@ function PatientAppointmentCard({ appointment, onCancel, onNavigateToChat }) {
                                         size="sm"
                                         variant="outline"
                                         onClick={copyRoomId}
-                                        className="ml-2"
+                                        className="w-full sm:w-auto sm:ml-2 text-xs"
                                     >
                                         {copiedRoomId ? (
-                                            <Check className="h-4 w-4" />
+                                            <Check className="h-3 w-3 sm:h-4 sm:w-4" />
                                         ) : (
-                                            <Copy className="h-4 w-4" />
+                                            <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
                                         )}
                                     </Button>
                                 </div>
@@ -425,9 +465,14 @@ function PatientAppointmentCard({ appointment, onCancel, onNavigateToChat }) {
                         )}
                     </div>
 
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-2 w-full lg:w-auto lg:min-w-[180px]">
                         {appointment.status === "scheduled" && (
-                            <Button size="sm" variant="destructive" onClick={() => onCancel(appointment._id)}>
+                            <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => onCancel(appointment._id)}
+                                className="text-xs sm:text-sm w-full"
+                            >
                                 Cancel
                             </Button>
                         )}
@@ -436,9 +481,10 @@ function PatientAppointmentCard({ appointment, onCancel, onNavigateToChat }) {
                             <Button
                                 size="sm"
                                 variant="outline"
-                                className="hover:bg-primary hover:text-primary-foreground bg-transparent"
+                                className="hover:bg-primary hover:text-primary-foreground bg-transparent text-xs sm:text-sm w-full"
+                                onClick={() => onNavigateToVideoCall(appointment.appointmentId)}
                             >
-                                <Video className="mr-2 h-4 w-4" />
+                                <Video className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                                 Join Call
                             </Button>
                         )}
@@ -447,11 +493,11 @@ function PatientAppointmentCard({ appointment, onCancel, onNavigateToChat }) {
                             <Button
                                 size="sm"
                                 variant="outline"
-                                className="hover:bg-primary hover:text-primary-foreground bg-transparent"
+                                className="hover:bg-primary hover:text-primary-foreground bg-transparent text-xs sm:text-sm w-full"
                                 onClick={() => onNavigateToChat(appointment._id)}
                                 disabled={!canStartChat()}
                             >
-                                <MessageCircle className="mr-2 h-4 w-4" />
+                                <MessageCircle className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                                 {canStartChat() ? 'Start Chat' : 'Chat'}
                             </Button>
                         )}

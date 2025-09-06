@@ -68,6 +68,7 @@ export async function POST(request) {
         // Verify user is a doctor
         const user = await User.findById(userId)
         if (!user || user.role !== "doctor") {
+            console.log("no doc")
             return NextResponse.json({ success: false, message: "Only doctors can set availability" }, { status: 403 })
         }
 

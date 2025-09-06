@@ -41,7 +41,7 @@ export async function POST(request) {
             consultationFee,
             availableDays,
             bio,
-
+            photos,
             clinicAddress,
             licenseNumber
         } = body;
@@ -77,6 +77,7 @@ export async function POST(request) {
             doctorProfile: {
                 doctorId: generateDoctorId(),
                 fullName,
+                docPhoto: photos,
                 specialization, // array of strings
                 qualifications,
                 experienceYears,

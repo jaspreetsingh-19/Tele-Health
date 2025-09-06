@@ -40,7 +40,7 @@ const chatRoomSchema = new mongoose.Schema({
     appointmentId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Appointment",
-        required: true
+        // required: true
     },
     patientId: {
         type: mongoose.Schema.Types.ObjectId,

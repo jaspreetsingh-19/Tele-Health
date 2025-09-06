@@ -3,12 +3,17 @@ import crypto from "crypto"
 import connect from "@/lib/db"
 import Appointment from "@/models/Appointment"
 import Razorpay from "razorpay"
+import ChatRoom from "@/models/ChatRoom"
 import { getDataFromToken } from "@/helper/getDataFromToken"
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_KEY_SECRET,
 })
+function generateRoom() {
+    const randomNumber = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
+    return randomNumber.toString();
+}
 
 export async function POST(request) {
     try {
@@ -16,7 +21,8 @@ export async function POST(request) {
         const userId = await getDataFromToken(request)
         const body = await request.json()
 
-        const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body
+        const { razorpay_order_id, razorpay_payment_id, razorpay_signature, appointmentId } = body
+        console.log("id", appointmentId)
 
         // Step 1: Verify payment signature
         const sign = razorpay_order_id + "|" + razorpay_payment_id
@@ -64,7 +70,7 @@ export async function POST(request) {
 
         // Step 5: Generate room ID for video consultations
         const roomId = order.notes.consultationType === "video"
-            ? `room_${userId}_${order.notes.doctorId}_${Date.now()}`
+            ? `room_${userId}_${generateRoom()}`
             : null
 
         // Step 6: Create appointment ONLY after successful payment verification
@@ -89,6 +95,17 @@ export async function POST(request) {
 
         const appointment = new Appointment(appointmentData)
         await appointment.save()
+
+        if (order.notes.consultationType === "video") {
+            await ChatRoom.create({
+                roomId,
+
+                patientId: order.notes.patientId,
+                doctorId: order.notes.doctorId,
+                messages: [],
+                isActive: true
+            });
+        }
 
         console.log("Appointment created successfully:", appointment._id)
 

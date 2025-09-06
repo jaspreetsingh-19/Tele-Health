@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-// import { toast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 import axios from "axios"
 import ConsultationControls from "@/components/ConsultationControls"
 import { useRouter } from "next/navigation"
@@ -54,11 +54,7 @@ function DoctorAppointmentsContent() {
                 setAppointments(filteredAppointments)
             }
         } catch (error) {
-            // toast({
-            //     title: "Error",
-            //     description: "Failed to fetch appointments",
-            //     variant: "destructive",
-            // })
+            toast.error("Failed to fetch appointments")
         } finally {
             setLoading(false)
         }
@@ -68,18 +64,11 @@ function DoctorAppointmentsContent() {
         try {
             const response = await axios.put(`/api/appointments/${appointmentId}`, { status })
             if (response.data.success) {
-                // toast({
-                //     title: "Success",
-                //     description: "Appointment status updated",
-                // })
+                toast.success("Appointment status updated successfully")
                 fetchAppointments()
             }
         } catch (error) {
-            // toast({
-            //     title: "Error",
-            //     description: "Failed to update appointment",
-            //     variant: "destructive",
-            // })
+            toast.error("Failed to update appointment status")
         }
     }
 
@@ -293,7 +282,8 @@ function DoctorAppointmentsContent() {
 
 function AppointmentCard({ appointment, onStatusUpdate }) {
     const [copiedRoomId, setCopiedRoomId] = useState(false)
-    const Router = useRouter()
+    const router = useRouter()
+
     const formatDate = (dateString) => {
         return new Date(dateString).toLocaleDateString("en-US", {
             weekday: "long",
@@ -302,19 +292,19 @@ function AppointmentCard({ appointment, onStatusUpdate }) {
             day: "numeric",
         })
     }
+
     const copyRoomId = async () => {
         try {
             await navigator.clipboard.writeText(appointment.roomId)
             setCopiedRoomId(true)
             setTimeout(() => setCopiedRoomId(false), 2000)
-            // toast({
-            //     title: "Copied!",
-            //     description: "Room ID copied to clipboard",
-            // })
+            toast.success("Room ID copied to clipboard")
         } catch (err) {
             console.error('Failed to copy room ID:', err)
+            toast.error("Failed to copy room ID")
         }
     }
+
     const formatTime = (timeString) => {
         return new Date(`2000-01-01T${timeString}`).toLocaleTimeString("en-US", {
             hour: "numeric",
@@ -323,83 +313,92 @@ function AppointmentCard({ appointment, onStatusUpdate }) {
         })
     }
 
-    function handleJoinCall(e) {
-        e.preventDefault()
-        Router.push("/doctor/chatWithPatient")
+    const handleStartChat = (appointmentId) => {
+        router.push(`/doctor/chatWithPatient?appointmentId=${appointmentId}`)
     }
+
+    const handleJoinVideoCall = (appointmentId) => {
+        router.push(`/doctor/videoCallPatient?appointmentId=${appointmentId}`)
+    }
+
     return (
 
         <Card className="hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-                <div className="flex items-start justify-between">
+            <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="flex-1 space-y-3">
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
                             <div className="flex items-center gap-2">
-                                <User className="h-4 w-4 text-primary" />
-                                <span className="font-medium">
+                                <User className="h-4 w-4 text-primary flex-shrink-0" />
+                                <span className="font-medium text-sm sm:text-base">
                                     {appointment.patientId?.patientProfile?.fullName || appointment.patientId?.username}
                                 </span>
                             </div>
-                            <Badge className="bg-primary text-primary-foreground">{appointment.status}</Badge>
-                            <Badge className="bg-accent text-accent-foreground">{appointment.paymentStatus}</Badge>
+                            <div className="flex gap-2 flex-wrap">
+                                <Badge className="bg-primary text-primary-foreground text-xs">{appointment.status}</Badge>
+                                <Badge className="bg-accent text-accent-foreground text-xs">{appointment.paymentStatus}</Badge>
+                            </div>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <Calendar className="h-4 w-4" />
-                                {formatDate(appointment.appointmentDate)}
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                            <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                                <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                <span className="truncate">{formatDate(appointment.appointmentDate)}</span>
                             </div>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <Clock className="h-4 w-4" />
-                                {formatTime(appointment.timeSlot.startTime)} - {formatTime(appointment.timeSlot.endTime)}
+                            <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                                <Clock className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                <span>{formatTime(appointment.timeSlot.startTime)} - {formatTime(appointment.timeSlot.endTime)}</span>
                             </div>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
                                 {appointment.consultationType === "video" ? (
-                                    <Video className="h-4 w-4" />
+                                    <Video className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                                 ) : (
-                                    <MessageCircle className="h-4 w-4" />
+                                    <MessageCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                                 )}
-                                {appointment.consultationType === "video" ? "Video Call" : "Chat"}
+                                <span>{appointment.consultationType === "video" ? "Video Call" : "Chat"}</span>
                             </div>
                         </div>
 
-                        <div className="text-sm">
+                        <div className="text-xs sm:text-sm">
                             <span className="font-medium">Symptoms: </span>
                             <span className="text-muted-foreground">{appointment.symptoms}</span>
                         </div>
 
-                        <div className="text-sm">
+                        <div className="text-xs sm:text-sm">
                             <span className="font-medium">Fee: </span>
                             <span className="text-muted-foreground">₹{appointment.consultationFee}</span>
                         </div>
                     </div>
 
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-2 w-full lg:w-auto lg:min-w-[180px]">
                         {appointment.status === "scheduled" && (
                             <>
                                 <Button
                                     size="sm"
                                     onClick={() => onStatusUpdate(appointment._id, "completed")}
-                                    className="bg-accent hover:bg-accent/90"
+                                    className="bg-accent hover:bg-accent/90 text-xs sm:text-sm w-full"
                                 >
                                     Mark Complete
                                 </Button>
-                                <Button size="sm" variant="outline" onClick={() => onStatusUpdate(appointment._id, "no-show")}>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => onStatusUpdate(appointment._id, "no-show")}
+                                    className="text-xs sm:text-sm w-full"
+                                >
                                     No Show
                                 </Button>
                             </>
                         )}
 
-
-
                         {appointment.consultationType === "video" && appointment.status === "scheduled" && (
                             <Button
                                 size="sm"
                                 variant="outline"
-                                className="hover:bg-primary hover:text-primary-foreground bg-transparent"
-                                onClick={handleJoinCall}
+                                className="hover:bg-primary hover:text-primary-foreground bg-transparent text-xs sm:text-sm w-full"
+                                onClick={() => handleJoinVideoCall(appointment.appointmentId)}
                             >
-                                <Video className="mr-2 h-4 w-4" />
+                                <Video className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                                 Join Call
                             </Button>
                         )}
@@ -408,18 +407,20 @@ function AppointmentCard({ appointment, onStatusUpdate }) {
                             <Button
                                 size="sm"
                                 variant="outline"
-                                className="hover:bg-primary hover:text-primary-foreground bg-transparent"
+                                className="hover:bg-primary hover:text-primary-foreground bg-transparent text-xs sm:text-sm w-full"
+                                onClick={() => handleStartChat(appointment._id)}
                             >
-                                <MessageCircle className="mr-2 h-4 w-4" />
-                                Open Chat
+                                <MessageCircle className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                                Start Chat
                             </Button>
                         )}
+
                         {appointment.consultationType === "video" && appointment.roomId && (
-                            <div className="bg-muted/50 rounded-lg p-3 border">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <span className="text-sm font-medium">Meeting Room ID:</span>
-                                        <div className="text-sm text-muted-foreground font-mono mt-1">
+                            <div className="bg-muted/50 rounded-lg p-2 sm:p-3 border w-full">
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                    <div className="min-w-0 flex-1">
+                                        <span className="text-xs sm:text-sm font-medium">Meeting Room ID:</span>
+                                        <div className="text-xs text-muted-foreground font-mono mt-1 break-all">
                                             {appointment.roomId}
                                         </div>
                                     </div>
@@ -427,19 +428,17 @@ function AppointmentCard({ appointment, onStatusUpdate }) {
                                         size="sm"
                                         variant="outline"
                                         onClick={copyRoomId}
-                                        className="ml-2"
+                                        className="w-full sm:w-auto sm:ml-2 text-xs"
                                     >
                                         {copiedRoomId ? (
-                                            <Check className="h-4 w-4" />
+                                            <Check className="h-3 w-3 sm:h-4 sm:w-4" />
                                         ) : (
-                                            <Copy className="h-4 w-4" />
+                                            <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
                                         )}
                                     </Button>
                                 </div>
                             </div>
                         )}
-
-                        <ConsultationControls appointment={appointment} userRole="doctor" />
                     </div>
                 </div>
             </CardContent>

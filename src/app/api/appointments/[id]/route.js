@@ -9,12 +9,12 @@ export async function GET(request, { params }) {
     try {
         await connect()
         const userId = await getDataFromToken(request)
-        const { id } = params
+        const { id } = await params
 
-        const appointment = await Appointment.findById(id)
+        const appointment = await Appointment.findOne({ appointmentId: id })
             .populate("patientId", "username email patientProfile")
             .populate("doctorId", "username email doctorProfile")
-
+        console.log("appoitment", appointment)
         if (!appointment) {
             return NextResponse.json({ success: false, message: "Appointment not found" }, { status: 404 })
         }

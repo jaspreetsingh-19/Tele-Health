@@ -10,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Badge } from "@/components/ui/badge"
 import axios from "axios"
 import Script from "next/script"
+import { toast } from "sonner"
 
 <Script
     src="https://checkout.razorpay.com/v1/checkout.js"
@@ -37,17 +38,14 @@ export default function BookingModal({ doctor, selectedDate, selectedSlot, onClo
     const handleSubmit = async (e) => {
         e.preventDefault()
         if (!formData.symptoms.trim()) {
-            // toast({
-            //     title: "Error",
-            //     description: "Please describe your symptoms",
-            //     variant: "destructive",
-            // })
+            toast.error("Please describe your symptoms")
             return
         }
 
         try {
             setLoading(true)
             console.log("Starting booking process")
+            toast.loading("Preparing your appointment...")
 
             // STEP 1: Create payment order FIRST (without creating appointment)
             const paymentResponse = await axios.post("/api/payments/create-order", {
@@ -61,13 +59,17 @@ export default function BookingModal({ doctor, selectedDate, selectedSlot, onClo
             })
 
             if (paymentResponse.data.success) {
+                toast.success("Payment order created successfully")
+
                 // Load Razorpay script
                 const isScriptLoaded = await loadRazorpayScript();
                 if (!isScriptLoaded) {
-                    alert('Razorpay SDK failed to load. Please check your internet connection.');
+                    toast.error('Razorpay SDK failed to load. Please check your internet connection.');
                     setLoading(false);
                     return;
                 }
+
+                toast.info("Opening payment gateway...")
 
                 // STEP 2: Initialize Razorpay payment
                 const options = {
@@ -79,6 +81,8 @@ export default function BookingModal({ doctor, selectedDate, selectedSlot, onClo
                     order_id: paymentResponse.data.order.id,
                     handler: async (response) => {
                         try {
+                            toast.loading("Verifying payment and booking appointment...")
+
                             // STEP 3: Verify payment AND create appointment in one call
                             const verifyResponse = await axios.post("/api/payments/verify-and-book", {
                                 razorpay_order_id: response.razorpay_order_id,
@@ -94,25 +98,19 @@ export default function BookingModal({ doctor, selectedDate, selectedSlot, onClo
                             })
 
                             if (verifyResponse.data.success) {
-                                // toast({
-                                //     title: "Payment Successful",
-                                //     description: "Your appointment has been confirmed!",
-                                // })
+                                toast.success("Payment successful! Your appointment has been confirmed.")
                                 onSuccess()
                             }
                         } catch (error) {
                             console.error("Payment verification failed:", error)
-                            // toast({
-                            //     title: "Payment Verification Failed",
-                            //     description: "Please contact support",
-                            //     variant: "destructive",
-                            // })
+                            toast.error("Payment verification failed. Please contact support.")
                         }
                     },
                     modal: {
                         ondismiss: () => {
                             // Payment was cancelled/dismissed - no appointment created
                             console.log("Payment cancelled by user")
+                            toast.info("Payment cancelled")
                             setLoading(false)
                         }
                     },
@@ -130,11 +128,7 @@ export default function BookingModal({ doctor, selectedDate, selectedSlot, onClo
                     // Payment failed - no appointment created
                     console.log("Payment failed:", response.error)
                     setLoading(false)
-                    // toast({
-                    //     title: "Payment Failed",
-                    //     description: response.error.description || "Payment processing failed",
-                    //     variant: "destructive",
-                    // })
+                    toast.error(response.error.description || "Payment processing failed")
                 })
 
                 rzp.open()
@@ -142,11 +136,7 @@ export default function BookingModal({ doctor, selectedDate, selectedSlot, onClo
         } catch (error) {
             console.error("Booking error:", error)
             setLoading(false)
-            // toast({
-            //     title: "Error",
-            //     description: error.response?.data?.message || "Failed to initiate booking process",
-            //     variant: "destructive",
-            // })
+            toast.error(error.response?.data?.message || "Failed to initiate booking process")
         }
     }
 
@@ -168,27 +158,27 @@ export default function BookingModal({ doctor, selectedDate, selectedSlot, onClo
     }
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>Book Appointment</CardTitle>
-                    <Button variant="ghost" size="sm" onClick={onClose}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-3 md:p-4 z-50">
+            <Card className="w-full max-w-2xl max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
+                <CardHeader className="flex flex-row items-center justify-between pb-4 md:pb-6 px-4 md:px-6 pt-4 md:pt-6">
+                    <CardTitle className="text-lg md:text-xl">Book Appointment</CardTitle>
+                    <Button variant="ghost" size="sm" onClick={onClose} className="flex-shrink-0">
                         <X className="h-4 w-4" />
                     </Button>
                 </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                <CardContent className="px-4 md:px-6 pb-4 md:pb-6">
+                    <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
                         {/* Appointment Details */}
-                        <div className="space-y-4">
-                            <h3 className="font-medium">Appointment Details</h3>
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div className="space-y-3 md:space-y-4">
+                            <h3 className="font-medium text-sm md:text-base">Appointment Details</h3>
+                            <div className="grid grid-cols-1 gap-2 md:gap-4 sm:grid-cols-2">
                                 <div className="flex items-center gap-2 p-3 bg-secondary rounded-lg">
-                                    <Calendar className="h-4 w-4 text-primary" />
-                                    <span className="text-sm">{formatDate(selectedDate)}</span>
+                                    <Calendar className="h-4 w-4 text-primary flex-shrink-0" />
+                                    <span className="text-xs md:text-sm break-words">{formatDate(selectedDate)}</span>
                                 </div>
                                 <div className="flex items-center gap-2 p-3 bg-secondary rounded-lg">
-                                    <Clock className="h-4 w-4 text-primary" />
-                                    <span className="text-sm">
+                                    <Clock className="h-4 w-4 text-primary flex-shrink-0" />
+                                    <span className="text-xs md:text-sm">
                                         {formatTime(selectedSlot.startTime)} - {formatTime(selectedSlot.endTime)}
                                     </span>
                                 </div>
@@ -196,34 +186,41 @@ export default function BookingModal({ doctor, selectedDate, selectedSlot, onClo
                         </div>
 
                         {/* Doctor Info */}
-                        <div className="space-y-2">
-                            <h3 className="font-medium">Doctor</h3>
-                            <div className="flex items-center justify-between p-3 bg-secondary rounded-lg">
-                                <div>
-                                    <p className="font-medium">{doctor.doctorProfile.fullName}</p>
-                                    <p className="text-sm text-muted-foreground">{doctor.doctorProfile.specialization?.join(", ")}</p>
+                        <div className="space-y-2 md:space-y-3">
+                            <h3 className="font-medium text-sm md:text-base">Doctor</h3>
+                            <div className="flex items-center justify-between p-3 bg-secondary rounded-lg gap-3">
+                                <div className="min-w-0 flex-1">
+                                    <p className="font-medium text-sm md:text-base truncate">
+                                        {doctor.doctorProfile.fullName}
+                                    </p>
+                                    <p className="text-xs md:text-sm text-muted-foreground break-words">
+                                        {doctor.doctorProfile.specialization?.join(", ")}
+                                    </p>
                                 </div>
-                                <Badge className="bg-primary text-primary-foreground">₹{doctor.doctorProfile.consultationFee}</Badge>
+                                <Badge className="bg-primary text-primary-foreground flex-shrink-0 text-xs md:text-sm">
+                                    ₹{doctor.doctorProfile.consultationFee}
+                                </Badge>
                             </div>
                         </div>
 
                         {/* Consultation Type */}
-                        <div className="space-y-3">
-                            <Label>Consultation Type</Label>
+                        <div className="space-y-2 md:space-y-3">
+                            <Label className="text-sm md:text-base">Consultation Type</Label>
                             <RadioGroup
                                 value={formData.consultationType}
                                 onValueChange={(value) => setFormData({ ...formData, consultationType: value })}
+                                className="space-y-2"
                             >
                                 <div className="flex items-center space-x-2">
                                     <RadioGroupItem value="video" id="video" />
-                                    <Label htmlFor="video" className="flex items-center gap-2 cursor-pointer">
+                                    <Label htmlFor="video" className="flex items-center gap-2 cursor-pointer text-sm md:text-base">
                                         <Video className="h-4 w-4 text-primary" />
                                         Video Call
                                     </Label>
                                 </div>
                                 <div className="flex items-center space-x-2">
                                     <RadioGroupItem value="chat" id="chat" />
-                                    <Label htmlFor="chat" className="flex items-center gap-2 cursor-pointer">
+                                    <Label htmlFor="chat" className="flex items-center gap-2 cursor-pointer text-sm md:text-base">
                                         <MessageCircle className="h-4 w-4 text-primary" />
                                         Chat
                                     </Label>
@@ -233,7 +230,9 @@ export default function BookingModal({ doctor, selectedDate, selectedSlot, onClo
 
                         {/* Symptoms */}
                         <div className="space-y-2">
-                            <Label htmlFor="symptoms">Describe your symptoms *</Label>
+                            <Label htmlFor="symptoms" className="text-sm md:text-base">
+                                Describe your symptoms *
+                            </Label>
                             <Textarea
                                 id="symptoms"
                                 placeholder="Please describe your symptoms, concerns, or reason for consultation..."
@@ -241,41 +240,69 @@ export default function BookingModal({ doctor, selectedDate, selectedSlot, onClo
                                 onChange={(e) => setFormData({ ...formData, symptoms: e.target.value })}
                                 rows={4}
                                 required
+                                className="text-sm md:text-base resize-none"
                             />
                         </div>
 
                         {/* Additional Notes */}
                         <div className="space-y-2">
-                            <Label htmlFor="notes">Additional Notes (Optional)</Label>
+                            <Label htmlFor="notes" className="text-sm md:text-base">
+                                Additional Notes (Optional)
+                            </Label>
                             <Textarea
                                 id="notes"
                                 placeholder="Any additional information you'd like to share with the doctor..."
                                 value={formData.patientNotes}
                                 onChange={(e) => setFormData({ ...formData, patientNotes: e.target.value })}
                                 rows={3}
+                                className="text-sm md:text-base resize-none"
                             />
                         </div>
 
                         {/* Payment Info */}
-                        <div className="p-4 bg-accent/10 rounded-lg">
+                        <div className="p-3 md:p-4 bg-accent/10 rounded-lg">
                             <div className="flex items-center gap-2 mb-2">
-                                <CreditCard className="h-4 w-4 text-primary" />
-                                <span className="font-medium">Payment Information</span>
+                                <CreditCard className="h-4 w-4 text-primary flex-shrink-0" />
+                                <span className="font-medium text-sm md:text-base">Payment Information</span>
                             </div>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-xs md:text-sm text-muted-foreground">
                                 You will be redirected to secure payment gateway to complete the payment of ₹
                                 {doctor.doctorProfile.consultationFee}. Your appointment will only be confirmed after successful payment.
                             </p>
                         </div>
 
                         {/* Action Buttons */}
-                        <div className="flex gap-3">
-                            <Button type="button" variant="outline" onClick={onClose} className="flex-1 bg-transparent">
+                        <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={onClose}
+                                className="flex-1 bg-transparent order-2 sm:order-1"
+                                disabled={loading}
+                            >
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={loading} className="flex-1 bg-primary hover:bg-primary/90">
-                                {loading ? "Processing..." : "Book & Pay"}
+                            <Button
+                                type="submit"
+                                disabled={loading}
+                                className="flex-1 bg-primary hover:bg-primary/90 order-1 sm:order-2"
+                            >
+                                {loading ? (
+                                    <div className="flex items-center gap-2">
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                        <span className="text-sm md:text-base">Processing...</span>
+                                    </div>
+                                ) : (
+                                    <span className="text-sm md:text-base">Book & Pay</span>
+                                )}
                             </Button>
+                        </div>
+
+                        {/* Mobile-specific note */}
+                        <div className="sm:hidden">
+                            <p className="text-xs text-center text-muted-foreground">
+                                Ensure you have a stable internet connection for payment processing
+                            </p>
                         </div>
                     </form>
                 </CardContent>

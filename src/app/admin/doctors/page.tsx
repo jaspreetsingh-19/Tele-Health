@@ -31,7 +31,7 @@ interface DoctorProfile {
     consultationFee?: number
     availableDays?: string[]
     bio?: string
-    languages?: string[]
+    // languages?: string[]
     clinicAddress?: {
         Address?: string
         city?: string
@@ -39,7 +39,8 @@ interface DoctorProfile {
         pincode?: string
         country?: string
     }
-    licenseNumber?: string
+    licenseNumber?: string,
+    docPhoto?: string
     rating?: number
     totalRatings?: number
     totalConsultations?: number
@@ -55,7 +56,7 @@ interface Doctor {
     isVerified: boolean
     createdAt: string
     lastLogin?: string | Date
-    avatar?: string
+    docPhoto?: string
     doctorProfile?: DoctorProfile
 }
 
@@ -70,7 +71,7 @@ interface CreateDoctorForm {
     consultationFee: number
     availableDays: string[]
     bio: string
-    languages: string[]
+    // languages: string[]
     clinicAddress: {
         Address: string
         city: string
@@ -78,7 +79,8 @@ interface CreateDoctorForm {
         pincode: string
         country: string
     }
-    licenseNumber: string
+    licenseNumber: string,
+    photos: string
 }
 
 const initialFormState: CreateDoctorForm = {
@@ -92,7 +94,7 @@ const initialFormState: CreateDoctorForm = {
     consultationFee: 0,
     availableDays: [],
     bio: "",
-    languages: [],
+    // languages: [],
     clinicAddress: {
         Address: "",
         city: "",
@@ -100,7 +102,8 @@ const initialFormState: CreateDoctorForm = {
         pincode: "",
         country: ""
     },
-    licenseNumber: ""
+    licenseNumber: "",
+    photos: ""
 }
 
 const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -112,70 +115,7 @@ const commonSpecializations = [
 ]
 
 export default function DoctorManagementPage() {
-    const [doctors, setDoctors] = useState<Doctor[]>([
-        // Mock data for demonstration
-        {
-            _id: "1",
-            username: "dr_smith",
-            email: "dr.smith@example.com",
-            role: "doctor",
-            isVerified: true,
-            createdAt: "2024-01-15T10:00:00Z",
-            lastLogin: "2024-08-10T14:30:00Z",
-            avatar: "",
-            doctorProfile: {
-                doctorId: "DOC001",
-                fullName: "Dr. John Smith",
-                specialization: ["Cardiology", "Internal Medicine"],
-                qualifications: "MBBS, MD Cardiology",
-                experienceYears: 15,
-                consultationFee: 500,
-                availableDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-                bio: "Experienced cardiologist with 15 years of practice",
-                languages: ["English", "Hindi"],
-                clinicAddress: {
-                    Address: "123 Medical Center",
-                    city: "New York",
-                    state: "NY",
-                    pincode: "10001",
-                    country: "USA"
-                },
-                licenseNumber: "MED123456",
-                rating: 4.5,
-                totalRatings: 120,
-                totalConsultations: 850,
-                isApproved: true,
-                isAvailableForConsultation: true
-            }
-        },
-        {
-            _id: "2",
-            username: "dr_johnson",
-            email: "dr.johnson@example.com",
-            role: "doctor",
-            isVerified: false,
-            createdAt: "2024-02-20T08:15:00Z",
-            lastLogin: "2024-08-11T09:45:00Z",
-            avatar: "",
-            doctorProfile: {
-                doctorId: "DOC002",
-                fullName: "Dr. Emily Johnson",
-                specialization: ["Dermatology"],
-                qualifications: "MBBS, MD Dermatology",
-                experienceYears: 8,
-                consultationFee: 400,
-                availableDays: ["Monday", "Wednesday", "Friday"],
-                bio: "Specialist in dermatological conditions",
-                languages: ["English"],
-                licenseNumber: "MED789012",
-                rating: 4.2,
-                totalRatings: 65,
-                totalConsultations: 320,
-                isApproved: false,
-                isAvailableForConsultation: true
-            }
-        }
-    ])
+    const [doctors, setDoctors] = useState<Doctor[]>([])
 
     const [loading, setLoading] = useState(false)
     const [searchTerm, setSearchTerm] = useState("")
@@ -189,6 +129,7 @@ export default function DoctorManagementPage() {
     const [createLoading, setCreateLoading] = useState(false)
     const [newSpecialization, setNewSpecialization] = useState("")
     const [newLanguage, setNewLanguage] = useState("")
+    const [photoFile, setPhotoFile] = useState<File | null>(null)
 
     // Fetch doctors
     const fetchDoctors = async () => {
@@ -196,8 +137,11 @@ export default function DoctorManagementPage() {
             setLoading(true)
             const response = await axios.get("/api/admin/doctors")
             if (response) {
+
                 const data = await response.data
+                console.log("doc dtaa is ",)
                 setDoctors(data || [])
+
             }
         } catch (error) {
             console.error("Error fetching doctors:", error)
@@ -225,23 +169,80 @@ export default function DoctorManagementPage() {
     }
 
     // Create doctor
-    const handleCreateDoctor = async (e: React.FormEvent) => {
-        e.preventDefault()
+    const handleCreateDoctor = async (e: any) => {
+        e.preventDefault();
+        setCreateLoading(true);
+
         try {
+            let photoUrl = "";
+
+            // 1. Upload to Cloudinary if file exists
+            if (photoFile) {
+                const formData = new FormData();
+                formData.append("file", photoFile);
+                formData.append("upload_preset", process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET!);
+
+                const res = await fetch(
+                    `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
+                    { method: "POST", body: formData }
+                );
+
+                const data = await res.json();
+                photoUrl = data.secure_url; // <-- get hosted image URL
+            }
+
+            // 2. Final payload
+            const payload = {
+                ...createForm,
+                photos: photoUrl
+            };
+
+            // 3. Call your backend API
             setCreateLoading(true)
-            const response = await axios.post("/api/admin/doctors", createForm)
+            const response = await axios.post("/api/admin/doctors", payload)
 
             if (response) {
                 await fetchDoctors()
                 setCreateDialogOpen(false)
                 setCreateForm(initialFormState)
             }
-        } catch (error) {
-            console.error("Error creating doctor:", error)
+
+            alert("Doctor created successfully!");
+
+            // Reset form
+            setCreateForm({
+                username: "",
+                email: "",
+                password: "",
+                fullName: "",
+                specialization: [],
+                qualifications: "",
+                experienceYears: 0,
+                consultationFee: 0,
+                licenseNumber: "",
+                bio: "",
+                availableDays: [],
+                clinicAddress: {
+                    Address: "",
+                    city: "",
+                    state: "",
+                    pincode: "",
+                    country: ""
+                },
+                photos: "",
+                // languages: []
+            });
+            setPhotoFile(null);
+            setCreateDialogOpen(false);
+
+        } catch (err) {
+            console.error(err);
+            alert("Error creating doctor");
         } finally {
-            setCreateLoading(false)
+            setCreateLoading(false);
         }
-    }
+    };
+
 
     const handleViewProfile = (doctor: Doctor) => {
         setSelectedDoctor(doctor)
@@ -409,9 +410,9 @@ export default function DoctorManagementPage() {
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex items-center space-x-3">
                                                 <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-                                                    {doctor.avatar ? (
+                                                    {doctor.doctorProfile?.docPhoto ? (
                                                         <img
-                                                            src={doctor.avatar}
+                                                            src={doctor.doctorProfile?.docPhoto}
                                                             alt={doctor.username}
                                                             className="h-10 w-10 rounded-full object-cover"
                                                         />
@@ -596,6 +597,37 @@ export default function DoctorManagementPage() {
                                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         />
                                     </div>
+                                </div>
+
+                                <div className="sm:col-span-2">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Profile Photo
+                                    </label>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            if (e.target.files && e.target.files[0]) {
+                                                setPhotoFile(e.target.files[0]);
+                                            } else {
+                                                setPhotoFile(null);
+                                            }
+                                        }}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md 
+               focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    {photoFile && (
+                                        <p className="text-sm text-gray-500 mt-1">
+                                            Selected: {photoFile.name}
+                                        </p>
+                                    )}
+                                    {createForm.photos && (
+                                        <img
+                                            src={createForm.photos}
+                                            alt="Preview"
+                                            className="mt-2 w-24 h-24 object-cover rounded-full border"
+                                        />
+                                    )}
                                 </div>
                             </div>
 
@@ -874,9 +906,9 @@ export default function DoctorManagementPage() {
                                     <div className="space-y-3">
                                         <div className="flex items-center space-x-3 mb-4">
                                             <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center">
-                                                {selectedDoctor.avatar ? (
+                                                {selectedDoctor.docPhoto ? (
                                                     <img
-                                                        src={selectedDoctor.avatar}
+                                                        src={selectedDoctor.docPhoto}
                                                         alt={selectedDoctor.username}
                                                         className="h-12 w-12 rounded-full object-cover"
                                                     />
@@ -973,7 +1005,7 @@ export default function DoctorManagementPage() {
                                             </div>
                                         )}
 
-                                        {selectedDoctor.doctorProfile?.languages && selectedDoctor.doctorProfile.languages.length > 0 && (
+                                        {/* {selectedDoctor.doctorProfile?.languages && selectedDoctor.doctorProfile.languages.length > 0 && (
                                             <div>
                                                 <p className="font-medium text-gray-700 mb-2 flex items-center">
                                                     <Globe className="h-4 w-4 mr-1" />
@@ -990,7 +1022,7 @@ export default function DoctorManagementPage() {
                                                     ))}
                                                 </div>
                                             </div>
-                                        )}
+                                        )} */}
 
                                         {selectedDoctor.doctorProfile?.availableDays && selectedDoctor.doctorProfile.availableDays.length > 0 && (
                                             <div>

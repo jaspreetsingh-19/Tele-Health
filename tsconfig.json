@@ -22,6 +22,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/app/patient/symptoms/page.jsx", "src/components/speech-input.jsx", "src/app/doctor/dashboard/page.jsx", "src/app/doctor/dashboard/page.jsx", "src/app/patient/appointment/page.jsx", "src/app/page.jsx"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/app/patient/symptoms/page.jsx", "src/components/speech-input.jsx", "src/app/doctor/dashboard/page.jsx", "src/app/doctor/dashboard/page.jsx", "src/app/patient/appointment/page.jsx", "src/app/page.jsx", "src/components/video/TelehealthVideoCall.jsx", "src/components/video/TelehealthVideoCall.jsx", "src/components/FileUpload.jsx", "src/components/FileMessage.jsx"],
   "exclude": ["node_modules"]
 }

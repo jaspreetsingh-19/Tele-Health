@@ -1,138 +1,134 @@
-// server.js - Updated version
-import { createServer } from 'http'
-import next from 'next';
-import { Server } from 'socket.io';
-import ChatRoom from "./src/models/ChatRoom.js"
-import connect from "./src/lib/db.js"
+import { createServer } from "http";
+import next from "next";
+import { Server } from "socket.io";
+import ChatRoom from "./src/models/ChatRoom.js";
+import VideoCall from "./src/models/VideoCall.js";
+import connect from "./src/lib/db.js";
 
-const dev = process.env.NODE_ENV !== 'production'
-const hostname = 'localhost'
-const port = process.env.PORT || 3000
+const dev = process.env.NODE_ENV !== "production";
+const hostname = "localhost";
+const port = process.env.PORT || 3000;
 
-const app = next({ dev, hostname, port })
-const handler = app.getRequestHandler()
-connect()
+const app = next({ dev, hostname, port });
+const handler = app.getRequestHandler();
+
+// Connect to MongoDB
+connect();
 
 app.prepare().then(() => {
-    const httpServer = createServer(handler)
+    const httpServer = createServer(handler);
 
     const io = new Server(httpServer, {
         cors: {
-            origin: "*",
-            methods: ["GET", "POST"]
-        }
-    })
+            origin: process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000",
+            methods: ["GET", "POST"],
+            credentials: true,
+        },
+        transports: ["websocket", "polling"],
+    });
 
-    // Store room participants and typing status
+    // Store room participants, typing status, video call sessions, and video messages
     const roomParticipants = new Map();
     const typingUsers = new Map();
+    const videoSessions = new Map(); // callId -> { participants: Map, offers: Map, answers: Map, iceCandidates: Map }
+    const videoMessages = new Map(); // callId -> [messages array] - ADDED THIS LINE
 
-    io.on('connection', (socket) => {
-        console.log('User connected:', socket.id)
+    io.on("connection", (socket) => {
+        console.log("🔌 User connected:", socket.id);
 
-        socket.on("join-room", async ({ roomId, username }) => {
-            socket.join(roomId);
-
-            // Store user info
-            socket.username = username;
-            socket.roomId = roomId;
-
-            // Add to room participants
-            if (!roomParticipants.has(roomId)) {
-                roomParticipants.set(roomId, new Set());
-            }
-            roomParticipants.get(roomId).add({ socketId: socket.id, username });
-
-            console.log(`➡️ ${username} (${socket.id}) joined room ${roomId}`);
-
-            // Notify others in the room
-            socket.to(roomId).emit("user-joined", {
-                message: `${username} joined the consultation`,
-                username,
-                timestamp: new Date().toISOString()
-            });
-
-            // Send current participants count to the room
-            const participantsCount = roomParticipants.get(roomId).size;
-            io.to(roomId).emit("room-info", {
-                participantsCount,
-                roomId,
-                participants: Array.from(roomParticipants.get(roomId))
-            });
-
-            // Send room history/initial data
+        // ============ CHAT HANDLERS ============
+        socket.on("join-room", async ({ roomId, username, userId }) => {
             try {
-                const chatRoom = await ChatRoom.findOne({ roomId });
-                if (chatRoom) {
-                    socket.emit("room-history", {
-                        messages: chatRoom.messages.slice(-50), // Last 50 messages
-                        roomInfo: {
-                            patientId: chatRoom.patientId,
-                            doctorId: chatRoom.doctorId,
-                            appointmentId: chatRoom.appointmentId
-                        }
-                    });
+                const chatRoom = await ChatRoom.findOne({ roomId }).populate([
+                    { path: "patientId", select: "_id username patientProfile avatar" },
+                    { path: "doctorId", select: "_id username doctorProfile avatar" },
+                ]);
+
+                if (!chatRoom) {
+                    console.error(`❌ Room ${roomId} not found`);
+                    socket.emit("error", { message: "Room not found" });
+                    return;
                 }
-            } catch (error) {
-                console.error("Error fetching room history:", error);
-            }
-        });
 
-        // Enhanced typing indication
-        socket.on("typing", ({ roomId, userId, isTyping }) => {
-            if (!typingUsers.has(roomId)) {
-                typingUsers.set(roomId, new Map());
-            }
+                const patientId = chatRoom.patientId?._id?.toString();
+                const doctorId = chatRoom.doctorId?._id?.toString();
+                const hasAccess = patientId === userId || doctorId === userId;
 
-            const roomTyping = typingUsers.get(roomId);
+                if (!hasAccess) {
+                    console.error(`❌ Access denied for user ${userId} to room ${roomId}`);
+                    socket.emit("error", { message: "Access denied to this room" });
+                    return;
+                }
 
-            if (isTyping) {
-                roomTyping.set(userId, {
-                    username: socket.username,
-                    timestamp: Date.now()
+                socket.join(roomId);
+                socket.username = username;
+                socket.roomId = roomId;
+                socket.userId = userId;
+
+                if (!roomParticipants.has(roomId)) {
+                    roomParticipants.set(roomId, new Set());
+                }
+                roomParticipants.get(roomId).add({ socketId: socket.id, username, userId });
+
+                console.log(`✅ ${username} joined room ${roomId}`);
+
+                socket.to(roomId).emit("user-joined", {
+                    message: `${username} joined the consultation`,
+                    username,
+                    userId,
+                    timestamp: new Date().toISOString(),
                 });
-            } else {
-                roomTyping.delete(userId);
+
+                const participantsCount = roomParticipants.get(roomId).size;
+                io.to(roomId).emit("room-info", {
+                    participantsCount,
+                    roomId,
+                    participants: Array.from(roomParticipants.get(roomId)),
+                });
+
+                socket.emit("room-history", {
+                    messages: chatRoom.messages.slice(-50),
+                    roomInfo: {
+                        patientId: chatRoom.patientId,
+                        doctorId: chatRoom.doctorId,
+                        appointmentId: chatRoom.appointmentId,
+                        isActive: chatRoom.isActive,
+                    },
+                });
+            } catch (error) {
+                console.error("❌ Error in join-room:", error);
+                socket.emit("error", { message: "Failed to join room" });
             }
-
-            // Broadcast typing status to others in room
-            socket.to(roomId).emit("typing", {
-                userId,
-                isTyping,
-                username: socket.username,
-                typingUsers: Array.from(roomTyping.values())
-            });
-
-            // Auto-clear typing after 3 seconds of inactivity
-            setTimeout(() => {
-                const currentTime = Date.now();
-                const roomTyping = typingUsers.get(roomId);
-                if (roomTyping && roomTyping.has(userId)) {
-                    const typingInfo = roomTyping.get(userId);
-                    if (currentTime - typingInfo.timestamp > 3000) {
-                        roomTyping.delete(userId);
-                        socket.to(roomId).emit("typing", {
-                            userId,
-                            isTyping: false,
-                            username: socket.username,
-                            typingUsers: Array.from(roomTyping.values())
-                        });
-                    }
-                }
-            }, 3000);
         });
 
         socket.on("sendMessage", async (payload) => {
             try {
-                console.log("Received message payload:", payload);
+                console.log("📨 Received message payload:", payload);
 
-                // Enhanced message validation
-                if (!payload.roomId || !payload.content || !payload.sender) {
+                if (!payload.roomId || !payload.content || !payload.sender || !payload.senderId) {
                     console.error("❌ Invalid message payload:", payload);
+                    socket.emit("messageError", { error: "Invalid message data" });
                     return;
                 }
 
-                // Create comprehensive message object
+                const chatRoom = await ChatRoom.findOne({ roomId: payload.roomId });
+                if (!chatRoom) {
+                    console.error("❌ Room not found:", payload.roomId);
+                    socket.emit("messageError", { error: "Room not found" });
+                    return;
+                }
+
+                const patientId = chatRoom.patientId?.toString();
+                const doctorId = chatRoom.doctorId?.toString();
+                const hasAccess = patientId === payload.senderId || doctorId === payload.senderId;
+
+                if (!hasAccess) {
+                    console.error("❌ Message access denied for user:", payload.senderId);
+                    socket.emit("messageError", { error: "Access denied" });
+                    return;
+                }
+
+                const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
                 const messageData = {
                     roomId: payload.roomId,
                     sender: payload.sender,
@@ -141,201 +137,508 @@ app.prepare().then(() => {
                     content: payload.content,
                     type: payload.type || "text",
                     timestamp: new Date().toISOString(),
-                    messageId: Math.random().toString(36).substring(7),
-                    delivered: true
+                    messageId,
+                    delivered: true,
                 };
 
-                // Save message to database with enhanced error handling
-                try {
-                    const chatRoom = await ChatRoom.findOne({ roomId: payload.roomId });
-                    if (chatRoom) {
-                        const newMessage = {
-                            senderId: payload.senderId,
-                            senderType: payload.senderRole,
-                            message: payload.content,
-                            messageType: payload.type || 'text',
-                            timestamp: new Date(),
-                            isRead: false
-                        };
+                const newMessage = {
+                    senderId: payload.senderId,
+                    senderType: payload.senderRole,
+                    message: payload.content,
+                    messageType: payload.type || "text",
+                    timestamp: new Date(),
+                    isRead: false,
+                    messageId,
+                };
 
-                        chatRoom.messages.push(newMessage);
-                        await chatRoom.save();
-
-                        // Update message with actual DB ID
-                        messageData.dbId = newMessage._id;
-
-                        console.log("✅ Message saved to database");
-                    } else {
-                        console.warn("⚠️ Chat room not found, message sent but not saved");
-                    }
-                } catch (dbError) {
-                    console.error("❌ Database save error:", dbError);
-                    // Still send message even if DB save fails
-                    messageData.dbError = true;
+                if (payload.fileData) {
+                    newMessage.fileUrl = payload.fileData.url;
+                    newMessage.fileName = payload.fileData.name;
+                    newMessage.fileSize = payload.fileData.size;
+                    newMessage.fileType = payload.fileData.type;
+                    newMessage.cloudinaryPublicId = payload.fileData.publicId;
+                    messageData.fileData = payload.fileData;
                 }
 
-                // Clear typing indicator for sender
+                chatRoom.messages.push(newMessage);
+                chatRoom.updatedAt = new Date();
+                await chatRoom.save();
+
+                // Clear typing indicator
                 if (typingUsers.has(payload.roomId)) {
                     const roomTyping = typingUsers.get(payload.roomId);
                     if (roomTyping.has(payload.senderId)) {
                         roomTyping.delete(payload.senderId);
                         socket.to(payload.roomId).emit("typing", {
+                            roomId: payload.roomId,
                             userId: payload.senderId,
                             isTyping: false,
-                            username: payload.sender
+                            username: payload.sender,
                         });
                     }
                 }
 
-                // Send message to ALL users in the room (including sender for confirmation)
-                io.to(payload.roomId).emit("receiveMessage", messageData);
-                console.log(`✅ Message sent to room ${payload.roomId}: ${payload.content.substring(0, 50)}...`);
-
-            } catch (e) {
-                console.error("❌ sendMessage error:", e);
-
-                // Send error back to sender
+                socket.to(payload.roomId).emit("receiveMessage", messageData);
+                console.log(`✅ Message broadcast to room ${payload.roomId}`);
+            } catch (error) {
+                console.error("❌ sendMessage error:", error);
                 socket.emit("messageError", {
                     error: "Failed to send message",
-                    originalPayload: payload
+                    originalPayload: payload,
+                    errorDetails: error.message,
                 });
             }
         });
 
-        // Handle message read receipts
-        socket.on("markMessageRead", async ({ roomId, messageId, userId }) => {
+        // ============ VIDEO CALL HANDLERS ============
+        socket.on("join-video-call", async ({ callId, userId, username }) => {
             try {
-                const chatRoom = await ChatRoom.findOne({ roomId });
-                if (chatRoom) {
-                    const message = chatRoom.messages.id(messageId);
-                    if (message && !message.isRead) {
-                        message.isRead = true;
-                        await chatRoom.save();
+                console.log(`📹 User ${username} (${userId}) joining video call ${callId}`);
+                const videoCall = await VideoCall.findOne({ callId })
+                    .populate("patientId", "username avatar")
+                    .populate("doctorId", "username avatar");
 
-                        // Notify sender that message was read
-                        socket.to(roomId).emit("messageRead", {
-                            messageId,
-                            readBy: userId,
-                            timestamp: new Date().toISOString()
-                        });
-                    }
+                if (!videoCall) {
+                    socket.emit("video-error", { message: "Video call not found" });
+                    return;
+                }
+
+                const patientId = videoCall.patientId._id.toString();
+                const doctorId = videoCall.doctorId._id.toString();
+                const hasAccess = patientId === userId || doctorId === userId;
+
+                if (!hasAccess) {
+                    socket.emit("video-error", { message: "Access denied to this video call" });
+                    return;
+                }
+
+                socket.join(callId);
+                socket.callId = callId;
+                socket.userId = userId;
+                socket.username = username;
+
+                if (!videoSessions.has(callId)) {
+                    videoSessions.set(callId, {
+                        participants: new Map(),
+                        offers: new Map(),
+                        answers: new Map(),
+                        iceCandidates: new Map(),
+                    });
+                }
+
+                // Initialize video messages for this call if not exists
+                if (!videoMessages.has(callId)) {
+                    videoMessages.set(callId, []);
+                }
+
+                const session = videoSessions.get(callId);
+                if (session.participants.has(userId)) {
+                    session.participants.set(userId, { socketId: socket.id, userId, username });
+                } else {
+                    session.participants.set(userId, { socketId: socket.id, userId, username });
+                }
+
+                const existingParticipants = Array.from(session.participants.values()).filter(
+                    (p) => p.userId !== userId
+                );
+
+                // Update participant status in DB
+                const participant = videoCall.participants.find((p) => p.userId.toString() === userId);
+                if (participant) {
+                    participant.joinedAt = new Date();
+                    participant.isConnected = true;
+                }
+
+                const connectedCount = session.participants.size;
+                if (connectedCount === 1) videoCall.callStatus = "ringing";
+                else if (connectedCount === 2) {
+                    videoCall.callStatus = "connected";
+                    if (!videoCall.startTime) videoCall.startTime = new Date();
+                }
+
+                await videoCall.save();
+
+                // Notify others
+                existingParticipants.forEach((existingParticipant) => {
+                    io.to(existingParticipant.socketId).emit("user-joined-video", {
+                        userId,
+                        username,
+                        callStatus: videoCall.callStatus,
+                        participantCount: connectedCount,
+                    });
+                });
+
+                // Send video call history to the joining user
+                const callMessages = videoMessages.get(callId) || [];
+                socket.emit("video-call-joined", {
+                    callId,
+                    roomId: videoCall.roomId,
+                    callStatus: videoCall.callStatus,
+                    participantCount: connectedCount,
+                    otherParticipants: existingParticipants.map((p) => ({
+                        userId: p.userId,
+                        username: p.username,
+                    })),
+                    messages: callMessages.slice(-20), // Send last 20 messages
+                });
+
+                if (connectedCount === 2 && existingParticipants.length === 1) {
+                    const otherParticipant = existingParticipants[0];
+                    io.to(otherParticipant.socketId).emit("initiate-webrtc", {
+                        targetUserId: userId,
+                        targetUsername: username,
+                        role: "caller",
+                    });
+
+                    socket.emit("webrtc-ready", {
+                        targetUserId: otherParticipant.userId,
+                        targetUsername: otherParticipant.username,
+                        role: "callee",
+                    });
                 }
             } catch (error) {
-                console.error("Error marking message as read:", error);
+                console.error("❌ Error joining video call:", error);
+                socket.emit("video-error", { message: "Failed to join video call" });
             }
         });
 
-        // Handle consultation status changes
-        socket.on("consultationUpdate", ({ roomId, status, updatedBy }) => {
-            socket.to(roomId).emit("consultationStatusChanged", {
-                status,
-                updatedBy,
-                timestamp: new Date().toISOString()
-            });
-        });
+        // FIXED: Video Call Message Handler
+        // ... existing code ...
 
-        // Handle file/image sharing
-        socket.on("shareFile", async (payload) => {
+        // <CHANGE> fix: align payload fields with client and ensure all participants see messages
+        socket.on("sendVideoMessage", async (payload) => {
             try {
+                console.log("📹💬 Received video message payload:", payload);
+
+                const {
+                    callId,
+                    senderId,
+                    sender,           // client sends 'sender'
+                    senderName,       // fallback support if older clients used 'senderName'
+                    senderRole,       // client sends 'senderRole'
+                    content,
+                    type,
+                    fileData,
+                } = payload;
+
+                // Basic validation (allow file messages without content if needed)
+                // if (!callId || !senderId || (!content && !fileData)) {
+                //     console.error("❌ Invalid video message payload:", payload);
+                //     socket.emit("videoMessageError", { error: "Invalid video message data" });
+                //     return;
+                // }
+
+                // Check if video call exists and user has access
+                const videoCall = await VideoCall.findOne({ callId });
+                if (!videoCall) {
+                    socket.emit("videoMessageError", { error: "Video call not found" });
+                    return;
+                }
+
+                const patientId = videoCall.patientId?.toString();
+                const doctorId = videoCall.doctorId?.toString();
+                const hasAccess = patientId === senderId || doctorId === senderId;
+
+                if (!hasAccess) {
+                    console.error("❌ Video message access denied for user:", senderId);
+                    socket.emit("videoMessageError", { error: "Access denied to this video call" });
+                    return;
+                }
+
+                // Check if user is in the video session
+                const session = videoSessions.get(callId);
+                if (!session || !session.participants.has(senderId)) {
+                    socket.emit("videoMessageError", { error: "You must be in the video call to send messages" });
+                    return;
+                }
+
+                // Generate unique message ID
+                const messageId = `vmsg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+                // Normalize sender name/role for clients
+                const normalizedSender = sender || senderName || socket.username || "Unknown";
+                const normalizedRole =
+                    senderRole || (senderId === patientId ? "patient" : "doctor");
+
+                // Prepare message data for broadcast (match client expectations)
                 const messageData = {
-                    ...payload,
+                    callId,
+                    senderId,
+                    sender: normalizedSender,        // IMPORTANT: client expects 'sender'
+                    senderRole: normalizedRole,      // include senderRole for labeling
+                    content: content || "",
+                    type: type || "text",
                     timestamp: new Date().toISOString(),
-                    messageId: Math.random().toString(36).substring(7)
+                    messageId,
+                    delivered: true,
                 };
 
-                // Save file message to database
-                const chatRoom = await ChatRoom.findOne({ roomId: payload.roomId });
-                if (chatRoom) {
-                    const newMessage = {
-                        senderId: payload.senderId,
-                        senderType: payload.senderRole,
-                        message: payload.fileName || "File shared",
-                        messageType: payload.fileType || 'file',
-                        timestamp: new Date(),
-                        isRead: false
+                // Handle file data if present
+                if (fileData) {
+                    messageData.fileData = {
+                        url: fileData.url,
+                        name: fileData.name,
+                        size: fileData.size,
+                        type: fileData.type,
+                        publicId: fileData.publicId,
                     };
-
-                    chatRoom.messages.push(newMessage);
-                    await chatRoom.save();
                 }
 
-                io.to(payload.roomId).emit("fileShared", messageData);
+                // Store message in memory for this video call
+                if (!videoMessages.has(callId)) {
+                    videoMessages.set(callId, []);
+                }
+                videoMessages.get(callId).push(messageData);
+
+                // Optional: persist in VideoCall document (if schema supports it)
+                if (videoCall.messages) {
+                    const videoMessage = {
+                        senderId,
+                        senderType: normalizedRole,
+                        message: content || "",
+                        messageType: type || (fileData ? "file" : "text"),
+                        timestamp: new Date(),
+                        messageId,
+                    };
+
+                    if (fileData) {
+                        videoMessage.fileUrl = fileData.url;
+                        videoMessage.fileName = fileData.name;
+                        videoMessage.fileSize = fileData.size;
+                        videoMessage.fileType = fileData.type;
+                        videoMessage.cloudinaryPublicId = fileData.publicId;
+                    }
+
+                    videoCall.messages.push(videoMessage);
+                    videoCall.updatedAt = new Date();
+                    await videoCall.save();
+                }
+
+                // Broadcast to all other participants in the video call
+                session.participants.forEach((participant) => {
+                    if (participant.userId !== senderId) {
+                        io.to(participant.socketId).emit("receiveVideoMessage", messageData);
+                    }
+                });
+
+                // Ack back to sender
+                socket.emit("videoMessageSent", {
+                    messageId,
+                    timestamp: messageData.timestamp,
+                    callId,
+                });
+
+                console.log(`✅ Video message sent in call ${callId} by ${senderId}`);
             } catch (error) {
-                console.error("Error sharing file:", error);
+                console.error("❌ sendVideoMessage error:", error);
+                socket.emit("videoMessageError", {
+                    error: "Failed to send video message",
+                    originalPayload: payload,
+                    errorDetails: error.message,
+                });
             }
         });
 
-        socket.on('disconnect', () => {
-            console.log('User disconnected:', socket.id);
+        // ... existing code ...
 
-            // Clean up room participants
+        // WebRTC signaling handlers
+        socket.on("webrtc-offer", async ({ callId, offer, targetUserId }) => {
+            try {
+                if (socket.userId === targetUserId) return;
+
+                const session = videoSessions.get(callId);
+                if (!session) return;
+
+                const targetParticipant = session.participants.get(targetUserId);
+                if (targetParticipant) {
+                    session.offers.set(`${socket.userId}->${targetUserId}`, offer);
+                    io.to(targetParticipant.socketId).emit("webrtc-offer", {
+                        callId,
+                        offer,
+                        fromUserId: socket.userId,
+                        fromUsername: socket.username,
+                    });
+                }
+            } catch (error) {
+                console.error("❌ Error handling WebRTC offer:", error);
+            }
+        });
+
+        socket.on("webrtc-answer", async ({ callId, answer, targetUserId }) => {
+            try {
+                if (socket.userId === targetUserId) return;
+
+                const session = videoSessions.get(callId);
+                if (!session) return;
+
+                const targetParticipant = session.participants.get(targetUserId);
+                if (targetParticipant) {
+                    session.answers.set(`${socket.userId}->${targetUserId}`, answer);
+                    io.to(targetParticipant.socketId).emit("webrtc-answer", {
+                        callId,
+                        answer,
+                        fromUserId: socket.userId,
+                        fromUsername: socket.username,
+                    });
+                }
+            } catch (error) {
+                console.error("❌ Error handling WebRTC answer:", error);
+            }
+        });
+
+        socket.on("webrtc-ice-candidate", async ({ callId, candidate, targetUserId }) => {
+            try {
+                if (socket.userId === targetUserId) return;
+
+                const session = videoSessions.get(callId);
+                if (!session) return;
+
+                const targetParticipant = session.participants.get(targetUserId);
+                if (targetParticipant) {
+                    io.to(targetParticipant.socketId).emit("webrtc-ice-candidate", {
+                        callId,
+                        candidate,
+                        fromUserId: socket.userId,
+                    });
+                }
+            } catch (error) {
+                console.error("❌ Error handling ICE candidate:", error);
+            }
+        });
+
+        socket.on("leave-video-call", async ({ callId }) => {
+            try {
+                await handleVideoCallDisconnect(socket, callId);
+            } catch (error) {
+                console.error("❌ Error leaving video call:", error);
+            }
+        });
+
+        // Typing handler for video calls
+        socket.on("videoTyping", async ({ callId, userId, isTyping }) => {
+            try {
+                const session = videoSessions.get(callId);
+                if (!session || !session.participants.has(userId)) {
+                    return;
+                }
+
+                // Broadcast typing status to other participants
+                session.participants.forEach((participant) => {
+                    if (participant.userId !== userId) {
+                        io.to(participant.socketId).emit("videoTyping", {
+                            callId,
+                            userId,
+                            username: socket.username,
+                            isTyping,
+                        });
+                    }
+                });
+            } catch (error) {
+                console.error("❌ Error in video typing handler:", error);
+            }
+        });
+
+        // Typing handler for regular chat
+        socket.on("typing", async ({ roomId, userId, isTyping }) => {
+            try {
+                if (!typingUsers.has(roomId)) typingUsers.set(roomId, new Map());
+                const roomTyping = typingUsers.get(roomId);
+
+                if (isTyping) roomTyping.set(userId, { username: socket.username, timestamp: Date.now() });
+                else roomTyping.delete(userId);
+
+                socket.to(roomId).emit("typing", {
+                    roomId,
+                    userId,
+                    isTyping,
+                    username: socket.username,
+                    typingUsers: Array.from(roomTyping.values()),
+                });
+            } catch (error) {
+                console.error("❌ Error in typing handler:", error);
+            }
+        });
+
+        socket.on("disconnect", () => {
+            console.log("❌ User disconnected:", socket.id);
+            if (socket.callId) handleVideoCallDisconnect(socket, socket.callId);
+
             if (socket.roomId && roomParticipants.has(socket.roomId)) {
                 const participants = roomParticipants.get(socket.roomId);
-                participants.forEach(participant => {
-                    if (participant.socketId === socket.id) {
-                        participants.delete(participant);
-
-                        // Notify others that user left
-                        socket.to(socket.roomId).emit("user-left", {
-                            message: `${socket.username} left the consultation`,
-                            username: socket.username,
-                            timestamp: new Date().toISOString()
-                        });
-
-                        // Update participants count
-                        const participantsCount = participants.size;
-                        if (participantsCount > 0) {
-                            socket.to(socket.roomId).emit("room-info", {
-                                participantsCount,
-                                roomId: socket.roomId
-                            });
-                        }
-
-                        // Clean up empty rooms
-                        if (participants.size === 0) {
-                            roomParticipants.delete(socket.roomId);
-                            if (typingUsers.has(socket.roomId)) {
-                                typingUsers.delete(socket.roomId);
-                            }
-                        }
-                    }
-                });
+                const toRemove = Array.from(participants).find((p) => p.socketId === socket.id);
+                if (toRemove) {
+                    participants.delete(toRemove);
+                    socket.to(socket.roomId).emit("user-left", {
+                        message: `${socket.username} left the consultation`,
+                        username: socket.username,
+                        userId: socket.userId,
+                        timestamp: new Date().toISOString(),
+                    });
+                    if (participants.size === 0) roomParticipants.delete(socket.roomId);
+                }
             }
-
-            // Clean up typing indicators
-            if (socket.roomId && typingUsers.has(socket.roomId)) {
-                const roomTyping = typingUsers.get(socket.roomId);
-                roomTyping.forEach((typingInfo, userId) => {
-                    if (typingInfo.username === socket.username) {
-                        roomTyping.delete(userId);
-                        socket.to(socket.roomId).emit("typing", {
-                            userId,
-                            isTyping: false,
-                            username: socket.username
-                        });
-                    }
-                });
-            }
-        });
-
-        // Heartbeat to keep connection alive
-        socket.on("ping", () => {
-            socket.emit("pong");
-        });
-
-        // Error handling
-        socket.on("error", (error) => {
-            console.error("Socket error:", error);
         });
     });
 
+    // Handle video call disconnect
+    async function handleVideoCallDisconnect(socket, callId) {
+        try {
+            const session = videoSessions.get(callId);
+            if (session && session.participants.has(socket.userId)) {
+                session.participants.delete(socket.userId);
+                socket.to(callId).emit("user-left-video", {
+                    userId: socket.userId,
+                    username: socket.username,
+                    participantCount: session.participants.size,
+                    timestamp: new Date().toISOString(),
+                });
+
+                const videoCall = await VideoCall.findOne({ callId });
+                if (videoCall) {
+                    const dbParticipant = videoCall.participants.find(
+                        (p) => p.userId.toString() === socket.userId
+                    );
+                    if (dbParticipant) {
+                        dbParticipant.isConnected = false;
+                        dbParticipant.leftAt = new Date();
+                    }
+
+                    const connectedParticipants = videoCall.participants.filter((p) => p.isConnected);
+                    if (connectedParticipants.length === 0) {
+                        videoCall.callStatus = "ended";
+                        videoCall.endTime = new Date();
+                        if (videoCall.startTime)
+                            videoCall.duration = Math.floor((videoCall.endTime - videoCall.startTime) / 1000);
+
+                        // Clean up video messages when call ends
+                        videoMessages.delete(callId);
+                    } else if (connectedParticipants.length === 1) {
+                        videoCall.callStatus = "ringing";
+                    }
+
+                    await videoCall.save();
+                }
+
+                if (session.participants.size === 0) {
+                    videoSessions.delete(callId);
+                    // Clean up video messages when no participants left
+                    videoMessages.delete(callId);
+                }
+            }
+
+            socket.leave(callId);
+        } catch (error) {
+            console.error("❌ Error handling video call disconnect:", error);
+        }
+    }
+
     httpServer
-        .once('error', (err) => {
-            console.error(err)
-            process.exit(1)
+        .once("error", (err) => {
+            console.error("❌ Server error:", err);
+            process.exit(1);
         })
         .listen(port, () => {
-            console.log(`> Ready on http://${hostname}:${port}`)
-            console.log('> Socket.IO server initialized')
-        })
-})
+            console.log(`🚀 Server ready on http://${hostname}:${port}`);
+            console.log("🔌 Socket.IO server initialized with WebRTC support");
+        });
+});

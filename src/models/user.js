@@ -75,6 +75,7 @@ const userSchema = new mongoose.Schema({
     doctorProfile: {
         doctorId: String,
         fullName: String,
+        docPhoto: String,
         specialization: [String], // Changed to array for multiple specializations
         qualifications: String,
         experienceYears: Number,
