@@ -59,7 +59,7 @@ export default function FileMessage({
     const handleDownload = async () => {
         try {
             console.log("[v0] Starting download:", { fileName, fileUrl })
-            toast.loading("Starting download...")
+
 
             if (!fileUrl) {
                 console.error("[v0] Cannot download: fileUrl is undefined")

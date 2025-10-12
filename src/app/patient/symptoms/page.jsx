@@ -47,7 +47,7 @@ export default function SymptomsPage() {
 
         setIsLoading(true)
         setError(null)
-        toast.loading("Analyzing your symptoms...", { id: "analyze-toast" })
+
 
         try {
             const response = await axios.post("/api/symptom", {
@@ -82,7 +82,7 @@ export default function SymptomsPage() {
 
     const handleDeleteSymptom = async (patient) => {
         try {
-            toast.loading("Deleting symptom record...", { id: "delete-toast" })
+
             await axios.delete(`/api/symptom/${patient}`)
             setPreviousSymptoms((prev) => prev.filter((s) => s._id !== patient))
             if (currentAnalysis?._id === patient) {

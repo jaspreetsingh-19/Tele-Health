@@ -1,530 +1,638 @@
 "use client"
+import React, { useState, useEffect } from 'react';
+import { User, Calendar, Phone, MapPin, Briefcase, Award, DollarSign, Clock, Star, Camera, Save, Edit3, Shield } from 'lucide-react';
 
-import { useState, useEffect } from "react"
-import { Calendar, Users, DollarSign, Clock, TrendingUp, Video, MessageCircle, Star } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Progress } from "@/components/ui/progress"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-// import { toast } from ""
-import axios from "axios"
-import Link from "next/link"
-import ConsultationControls from "@/components/ConsultationControls"
-// import DoctorDashboardLayout from "@/components/DoctorDashboardLayout"
-
-function DoctorDashboardContent({ dashboardData, updateAppointmentStatus, formatDate, formatTime, getStatusColor }) {
-    return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold text-foreground">Doctor Dashboard</h1>
-                    <p className="text-muted-foreground">Welcome back! Here's your practice overview.</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <Link href="/doctor/availability">
-                        <Button variant="outline" className="bg-transparent">
-                            <Calendar className="mr-2 h-4 w-4" />
-                            Manage Availability
-                        </Button>
-                    </Link>
-                    <Link href="/doctor/appointments">
-                        <Button className="bg-primary hover:bg-primary/90">
-                            <Users className="mr-2 h-4 w-4" />
-                            View All Appointments
-                        </Button>
-                    </Link>
-                </div>
-            </div>
-
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
-                                <Calendar className="h-6 w-6 text-primary-foreground" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">Total Appointments</p>
-                                <p className="text-2xl font-bold">{dashboardData.stats.totalAppointments}</p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-accent rounded-full flex items-center justify-center">
-                                <Users className="h-6 w-6 text-accent-foreground" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">Completed</p>
-                                <p className="text-2xl font-bold">{dashboardData.stats.completedAppointments}</p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-chart-1 rounded-full flex items-center justify-center">
-                                <DollarSign className="h-6 w-6 text-white" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">Total Revenue</p>
-                                <p className="text-2xl font-bold">₹{dashboardData.stats.totalRevenue.toLocaleString()}</p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-chart-2 rounded-full flex items-center justify-center">
-                                <Star className="h-6 w-6 text-white" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">Average Rating</p>
-                                <p className="text-2xl font-bold">{dashboardData.stats.averageRating}</p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Main Content */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                {/* Today's Schedule */}
-                <div className="lg:col-span-2 space-y-6">
-                    <Tabs defaultValue="today" className="space-y-4">
-                        <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="today">Today's Schedule</TabsTrigger>
-                            <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-                        </TabsList>
-
-                        <TabsContent value="today">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <Clock className="h-5 w-5 text-primary" />
-                                        Today's Appointments ({dashboardData.todayAppointments.length})
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    {dashboardData.todayAppointments.length === 0 ? (
-                                        <div className="text-center py-8">
-                                            <Calendar className="mx-auto h-12 w-12 text-muted-foreground" />
-                                            <h3 className="mt-4 text-lg font-medium">No appointments today</h3>
-                                            <p className="text-muted-foreground">Enjoy your free day!</p>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-4">
-                                            {dashboardData.todayAppointments.map((appointment) => (
-                                                <div
-                                                    key={appointment._id}
-                                                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-secondary/50 transition-colors"
-                                                >
-                                                    <div className="flex items-center gap-4">
-                                                        <Avatar className="h-10 w-10">
-                                                            <AvatarImage src={appointment.patientId?.avatar || "/placeholder.svg"} />
-                                                            <AvatarFallback className="bg-primary text-primary-foreground">
-                                                                {appointment.patientId?.patientProfile?.fullName?.charAt(0) ||
-                                                                    appointment.patientId?.username?.charAt(0)}
-                                                            </AvatarFallback>
-                                                        </Avatar>
-                                                        <div>
-                                                            <p className="font-medium">
-                                                                {appointment.patientId?.patientProfile?.fullName || appointment.patientId?.username}
-                                                            </p>
-                                                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                                                <Clock className="h-3 w-3" />
-                                                                <span>
-                                                                    {formatTime(appointment.timeSlot.startTime)} -{" "}
-                                                                    {formatTime(appointment.timeSlot.endTime)}
-                                                                </span>
-                                                                <Badge className={getStatusColor(appointment.status)}>{appointment.status}</Badge>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="flex items-center gap-2">
-                                                        <ConsultationControls appointment={appointment} userRole="doctor" />
-                                                        {appointment.status === "scheduled" && (
-                                                            <Button
-                                                                size="sm"
-                                                                onClick={() => updateAppointmentStatus(appointment._id, "completed")}
-                                                                className="bg-accent hover:bg-accent/90"
-                                                            >
-                                                                Complete
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-
-                        <TabsContent value="upcoming">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <TrendingUp className="h-5 w-5 text-primary" />
-                                        Upcoming Appointments ({dashboardData.upcomingAppointments.length})
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    {dashboardData.upcomingAppointments.length === 0 ? (
-                                        <div className="text-center py-8">
-                                            <Calendar className="mx-auto h-12 w-12 text-muted-foreground" />
-                                            <h3 className="mt-4 text-lg font-medium">No upcoming appointments</h3>
-                                            <p className="text-muted-foreground">Your schedule is clear for the next week.</p>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-4">
-                                            {dashboardData.upcomingAppointments.slice(0, 5).map((appointment) => (
-                                                <div
-                                                    key={appointment._id}
-                                                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-secondary/50 transition-colors"
-                                                >
-                                                    <div className="flex items-center gap-4">
-                                                        <Avatar className="h-10 w-10">
-                                                            <AvatarImage src={appointment.patientId?.avatar || "/placeholder.svg"} />
-                                                            <AvatarFallback className="bg-primary text-primary-foreground">
-                                                                {appointment.patientId?.patientProfile?.fullName?.charAt(0) ||
-                                                                    appointment.patientId?.username?.charAt(0)}
-                                                            </AvatarFallback>
-                                                        </Avatar>
-                                                        <div>
-                                                            <p className="font-medium">
-                                                                {appointment.patientId?.patientProfile?.fullName || appointment.patientId?.username}
-                                                            </p>
-                                                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                                                <Calendar className="h-3 w-3" />
-                                                                <span>{formatDate(appointment.appointmentDate)}</span>
-                                                                <Clock className="h-3 w-3" />
-                                                                <span>{formatTime(appointment.timeSlot.startTime)}</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="flex items-center gap-2">
-                                                        <Badge
-                                                            variant="secondary"
-                                                            className={
-                                                                appointment.consultationType === "video"
-                                                                    ? "bg-primary/10 text-primary"
-                                                                    : "bg-accent/10 text-accent"
-                                                            }
-                                                        >
-                                                            {appointment.consultationType === "video" ? (
-                                                                <Video className="mr-1 h-3 w-3" />
-                                                            ) : (
-                                                                <MessageCircle className="mr-1 h-3 w-3" />
-                                                            )}
-                                                            {appointment.consultationType}
-                                                        </Badge>
-                                                        <span className="text-sm font-medium">₹{appointment.consultationFee}</span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-                    </Tabs>
-                </div>
-
-                {/* Sidebar */}
-                <div className="space-y-6">
-                    {/* Quick Stats */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Today's Overview</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm text-muted-foreground">Appointments</span>
-                                <span className="font-medium">{dashboardData.todayAppointments.length}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm text-muted-foreground">Completed</span>
-                                <span className="font-medium">
-                                    {dashboardData.todayAppointments.filter((apt) => apt.status === "completed").length}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm text-muted-foreground">Revenue</span>
-                                <span className="font-medium">
-                                    ₹
-                                    {dashboardData.todayAppointments
-                                        .filter((apt) => apt.status === "completed")
-                                        .reduce((sum, apt) => sum + apt.consultationFee, 0)}
-                                </span>
-                            </div>
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm text-muted-foreground">Completion Rate</span>
-                                    <span className="text-sm font-medium">
-                                        {dashboardData.todayAppointments.length > 0
-                                            ? Math.round(
-                                                (dashboardData.todayAppointments.filter((apt) => apt.status === "completed").length /
-                                                    dashboardData.todayAppointments.length) *
-                                                100,
-                                            )
-                                            : 0}
-                                        %
-                                    </span>
-                                </div>
-                                <Progress
-                                    value={
-                                        dashboardData.todayAppointments.length > 0
-                                            ? (dashboardData.todayAppointments.filter((apt) => apt.status === "completed").length /
-                                                dashboardData.todayAppointments.length) *
-                                            100
-                                            : 0
-                                    }
-                                    className="h-2"
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Recent Patients */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Recent Patients</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {dashboardData.recentPatients.length === 0 ? (
-                                <div className="text-center py-4">
-                                    <Users className="mx-auto h-8 w-8 text-muted-foreground" />
-                                    <p className="text-sm text-muted-foreground mt-2">No recent patients</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    {dashboardData.recentPatients.map((patient) => (
-                                        <div key={patient._id} className="flex items-center gap-3">
-                                            <Avatar className="h-8 w-8">
-                                                <AvatarImage src={patient.avatar || "/placeholder.svg"} />
-                                                <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                                                    {patient.patientProfile?.fullName?.charAt(0) || patient.username?.charAt(0)}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-medium truncate">
-                                                    {patient.patientProfile?.fullName || patient.username}
-                                                </p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {patient.totalAppointments} appointment{patient.totalAppointments !== 1 ? "s" : ""}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {/* Quick Actions */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Quick Actions</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                            <Link href="/doctor/availability">
-                                <Button variant="outline" className="w-full justify-start bg-transparent">
-                                    <Calendar className="mr-2 h-4 w-4" />
-                                    Set Availability
-                                </Button>
-                            </Link>
-                            <Link href="/doctor/appointments">
-                                <Button variant="outline" className="w-full justify-start bg-transparent">
-                                    <Users className="mr-2 h-4 w-4" />
-                                    View Appointments
-                                </Button>
-                            </Link>
-                            <Button variant="outline" className="w-full justify-start bg-transparent">
-                                <TrendingUp className="mr-2 h-4 w-4" />
-                                View Analytics
-                            </Button>
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
-        </div>
-    )
-}
-
-export default function DoctorDashboard() {
-    const [dashboardData, setDashboardData] = useState({
-        todayAppointments: [],
-        upcomingAppointments: [],
-        stats: {
-            totalAppointments: 0,
-            completedAppointments: 0,
-            totalRevenue: 0,
-            averageRating: 0,
-        },
-        recentPatients: [],
-    })
-    const [loading, setLoading] = useState(false)
-
-    const fetchDashboardData = async () => {
-        try {
-            setLoading(true)
-
-            // Fetch all appointments
-            const appointmentsResponse = await axios.get("/api/appointments?role=doctor")
-            if (appointmentsResponse.data.success) {
-                const appointments = appointmentsResponse.data.appointments
-
-                // Filter today's appointments
-                const today = new Date().toISOString().split("T")[0]
-                const todayAppointments = appointments.filter((apt) => apt.appointmentDate.split("T")[0] === today)
-
-                // Filter upcoming appointments (next 7 days)
-                const nextWeek = new Date()
-                nextWeek.setDate(nextWeek.getDate() + 7)
-                const upcomingAppointments = appointments.filter((apt) => {
-                    const aptDate = new Date(apt.appointmentDate)
-                    return aptDate > new Date() && aptDate <= nextWeek && apt.status === "scheduled"
-                })
-
-                // Calculate stats
-                const completedAppointments = appointments.filter((apt) => apt.status === "completed")
-                const totalRevenue = completedAppointments.reduce((sum, apt) => sum + apt.consultationFee, 0)
-
-                // Get recent unique patients
-                const patientMap = new Map()
-                appointments.forEach((apt) => {
-                    if (!patientMap.has(apt.patientId._id)) {
-                        patientMap.set(apt.patientId._id, {
-                            ...apt.patientId,
-                            lastAppointment: apt.appointmentDate,
-                            totalAppointments: 1,
-                        })
-                    } else {
-                        const existing = patientMap.get(apt.patientId._id)
-                        existing.totalAppointments += 1
-                        if (new Date(apt.appointmentDate) > new Date(existing.lastAppointment)) {
-                            existing.lastAppointment = apt.appointmentDate
-                        }
-                    }
-                })
-
-                const recentPatients = Array.from(patientMap.values())
-                    .sort((a, b) => new Date(b.lastAppointment) - new Date(a.lastAppointment))
-                    .slice(0, 5)
-
-                setDashboardData({
-                    todayAppointments,
-                    upcomingAppointments,
-                    stats: {
-                        totalAppointments: appointments.length,
-                        completedAppointments: completedAppointments.length,
-                        totalRevenue,
-                        averageRating: 4.8, // This would come from a ratings system
-                    },
-                    recentPatients,
-                })
-            }
-        } catch (error) {
-            // toast({
-            //     title: "Error",
-            //     description: "Failed to fetch dashboard data",
-            //     variant: "destructive",
-            // })
-        } finally {
-            setLoading(false)
+const DoctorProfile = () => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [profileData, setProfileData] = useState({
+        _id: '',
+        username: '',
+        email: '',
+        role: '',
+        avatar: '',
+        isVerified: false,
+        lastLogin: null,
+        authProvider: '',
+        doctorProfile: {
+            doctorId: '',
+            fullName: '',
+            docPhoto: '',
+            specialization: [],
+            qualifications: '',
+            experienceYears: 0,
+            consultationFee: 0,
+            availableDays: [],
+            bio: '',
+            clinicAddress: {
+                address: '',
+                city: '',
+                state: '',
+                pincode: '',
+                country: ''
+            },
+            licenseNumber: '',
+            rating: 0,
+            totalRatings: 0,
+            totalConsultations: 0,
+            isApproved: false,
+            isAvailableForConsultation: true
         }
-    }
+    });
 
-    const updateAppointmentStatus = async (appointmentId, status) => {
-        try {
-            const response = await axios.put(`/api/appointments/${appointmentId}`, { status })
-            if (response.data.success) {
-                // toast({
-                //     title: "Success",
-                //     description: "Appointment status updated",
-                // })
-                fetchDashboardData()
-            }
-        } catch (error) {
-            // toast({
-            //     title: "Error",
-            //     description: "Failed to update appointment",
-            //     variant: "destructive",
-            // })
-        }
-    }
+    const [formData, setFormData] = useState({});
+    const [newSpecialization, setNewSpecialization] = useState('');
 
-    const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleDateString("en-US", {
-            weekday: "short",
-            month: "short",
-            day: "numeric",
-        })
-    }
-
-    const formatTime = (timeString) => {
-        return new Date(`2000-01-01T${timeString}`).toLocaleTimeString("en-US", {
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
-        })
-    }
-
-    const getStatusColor = (status) => {
-        switch (status) {
-            case "scheduled":
-                return "bg-primary text-primary-foreground"
-            case "completed":
-                return "bg-accent text-accent-foreground"
-            case "cancelled":
-                return "bg-destructive text-destructive-foreground"
-            case "no-show":
-                return "bg-muted text-muted-foreground"
-            default:
-                return "bg-secondary text-secondary-foreground"
-        }
-    }
+    const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
     useEffect(() => {
-        fetchDashboardData()
-    }, [])
+        fetchProfile();
+    }, []);
+
+    const fetchProfile = async () => {
+        try {
+            setLoading(true);
+            const response = await fetch('/api/dashboard', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            const data = await response.json();
+            console.log("response is ", data)
+
+            if (data.success) {
+                const userData = data.user;
+                // API returns 'profile' but we use 'doctorProfile' in the component
+                const doctorProfile = userData.profile || userData.doctorProfile || {
+                    doctorId: '',
+                    fullName: '',
+                    docPhoto: '',
+                    specialization: [],
+                    qualifications: '',
+                    experienceYears: 0,
+                    consultationFee: 0,
+                    availableDays: [],
+                    bio: '',
+                    clinicAddress: {
+                        address: '',
+                        city: '',
+                        state: '',
+                        pincode: '',
+                        country: ''
+                    },
+                    licenseNumber: '',
+                    rating: 0,
+                    totalRatings: 0,
+                    totalConsultations: 0,
+                    isApproved: false,
+                    isAvailableForConsultation: true
+                };
+
+                setProfileData({ ...userData, doctorProfile });
+                setFormData({ ...userData, doctorProfile });
+            }
+        } catch (error) {
+            console.error('Error fetching profile:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleInputChange = (field, value, nested = null) => {
+        setFormData(prev => {
+            if (nested) {
+                return {
+                    ...prev,
+                    doctorProfile: {
+                        ...prev.doctorProfile,
+                        [nested]: {
+                            ...prev.doctorProfile[nested],
+                            [field]: value
+                        }
+                    }
+                };
+            } else {
+                return {
+                    ...prev,
+                    doctorProfile: {
+                        ...prev.doctorProfile,
+                        [field]: value
+                    }
+                };
+            }
+        });
+    };
+
+    const addSpecialization = () => {
+        if (newSpecialization.trim()) {
+            setFormData(prev => ({
+                ...prev,
+                doctorProfile: {
+                    ...prev.doctorProfile,
+                    specialization: [...(prev.doctorProfile.specialization || []), newSpecialization.trim()]
+                }
+            }));
+            setNewSpecialization('');
+        }
+    };
+
+    const removeSpecialization = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            doctorProfile: {
+                ...prev.doctorProfile,
+                specialization: (prev.doctorProfile.specialization || []).filter((_, i) => i !== index)
+            }
+        }));
+    };
+
+    const toggleAvailableDay = (day) => {
+        setFormData(prev => {
+            const currentDays = prev.doctorProfile?.availableDays || [];
+            const newDays = currentDays.includes(day)
+                ? currentDays.filter(d => d !== day)
+                : [...currentDays, day];
+
+            return {
+                ...prev,
+                doctorProfile: {
+                    ...prev.doctorProfile,
+                    availableDays: newDays
+                }
+            };
+        });
+    };
+
+    const handleSave = async () => {
+        setSaving(true);
+
+        try {
+            const updateData = {
+                doctorProfile: formData.doctorProfile,
+                avatar: formData.avatar
+            };
+
+            const response = await fetch('/api/dashboard', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(updateData),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                setProfileData(data.user);
+                setIsEditing(false);
+            } else {
+                throw new Error(data.error || 'Failed to update profile');
+            }
+        } catch (error) {
+            console.error('Error updating profile:', error);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleCancel = () => {
+        setFormData(profileData);
+        setIsEditing(false);
+    };
 
     if (loading) {
         return (
-            // <DoctorDashboardLayout>
-            //     <div className="min-h-screen bg-background flex items-center justify-center">
-            //         <div className="text-muted-foreground">Loading dashboard...</div>
-            //     </div>
-            // </DoctorDashboardLayout>
-            <></>
-        )
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            </div>
+        );
     }
 
     return (
-        // <DoctorDashboardLayout>
-        //     <DoctorDashboardContent
-        //         dashboardData={dashboardData}
-        //         updateAppointmentStatus={updateAppointmentStatus}
-        //         formatDate={formatDate}
-        //         formatTime={formatTime}
-        //         getStatusColor={getStatusColor}
-        //     />
-        // </DoctorDashboardLayout>
-        <></>
+        <div className="min-h-screen bg-gray-50 py-8">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+                {/* Header */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                            <div className="relative">
+                                {profileData.doctorProfile?.docPhoto || profileData.avatar ? (
+                                    <img
+                                        src={profileData.doctorProfile?.docPhoto || profileData.avatar}
+                                        alt="Profile"
+                                        className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
+                                    />
+                                ) : (
+                                    <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center">
+                                        <User className="w-8 h-8 text-gray-400" />
+                                    </div>
+                                )}
+                                {isEditing && (
+                                    <button className="absolute -bottom-2 -right-2 bg-blue-600 text-white rounded-full p-2 hover:bg-blue-700 transition-colors">
+                                        <Camera className="w-4 h-4" />
+                                    </button>
+                                )}
+                            </div>
+                            <div>
+                                <h1 className="text-2xl font-bold text-gray-900">
+                                    Dr. {profileData.doctorProfile?.fullName || profileData.username}
+                                </h1>
+                                <p className="text-gray-600">Doctor Profile</p>
+                                <div className="flex items-center mt-1 space-x-2">
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${profileData.isVerified
+                                        ? 'bg-green-100 text-green-800'
+                                        : 'bg-yellow-100 text-yellow-800'
+                                        }`}>
+                                        {profileData.isVerified ? 'Verified' : 'Unverified'}
+                                    </span>
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${profileData.doctorProfile?.isApproved
+                                        ? 'bg-blue-100 text-blue-800'
+                                        : 'bg-orange-100 text-orange-800'
+                                        }`}>
+                                        {profileData.doctorProfile?.isApproved ? 'Approved' : 'Pending Approval'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setIsEditing(!isEditing)}
+                            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                            <Edit3 className="w-4 h-4" />
+                            <span>{isEditing ? 'Cancel' : 'Edit Profile'}</span>
+                        </button>
+                    </div>
+                </div>
 
-    )
-}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Professional Information */}
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                        <div className="flex items-center space-x-2 mb-4">
+                            <Briefcase className="w-5 h-5 text-blue-600" />
+                            <h2 className="text-lg font-semibold text-gray-900">Professional Information</h2>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                                {isEditing ? (
+                                    <input
+                                        type="text"
+                                        value={formData.doctorProfile?.fullName || ''}
+                                        onChange={(e) => handleInputChange('fullName', e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                ) : (
+                                    <p className="text-gray-900">{profileData.doctorProfile?.fullName || 'Not provided'}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Specialization</label>
+                                {isEditing ? (
+                                    <div className="space-y-2">
+                                        <div className="flex space-x-2">
+                                            <input
+                                                type="text"
+                                                value={newSpecialization}
+                                                onChange={(e) => setNewSpecialization(e.target.value)}
+                                                placeholder="Add specialization..."
+                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                onKeyPress={(e) => e.key === 'Enter' && addSpecialization()}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={addSpecialization}
+                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                            >
+                                                Add
+                                            </button>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {formData.doctorProfile?.specialization?.map((spec, index) => (
+                                                <span
+                                                    key={index}
+                                                    className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+                                                >
+                                                    {spec}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeSpecialization(index)}
+                                                        className="ml-2 text-blue-600 hover:text-blue-800"
+                                                    >
+                                                        ×
+                                                    </button>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-wrap gap-2">
+                                        {profileData.doctorProfile?.specialization?.length > 0 ? (
+                                            profileData.doctorProfile.specialization.map((spec, index) => (
+                                                <span
+                                                    key={index}
+                                                    className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+                                                >
+                                                    {spec}
+                                                </span>
+                                            ))
+                                        ) : (
+                                            <p className="text-gray-500">No specializations added</p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Qualifications</label>
+                                {isEditing ? (
+                                    <textarea
+                                        value={formData.doctorProfile?.qualifications || ''}
+                                        onChange={(e) => handleInputChange('qualifications', e.target.value)}
+                                        rows={3}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="e.g., MBBS, MD, Fellowship..."
+                                    />
+                                ) : (
+                                    <p className="text-gray-900 whitespace-pre-wrap">{profileData.doctorProfile?.qualifications || 'Not provided'}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">License Number</label>
+                                {isEditing ? (
+                                    <input
+                                        type="text"
+                                        value={formData.doctorProfile?.licenseNumber || ''}
+                                        onChange={(e) => handleInputChange('licenseNumber', e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                ) : (
+                                    <p className="text-gray-900">{profileData.doctorProfile?.licenseNumber || 'Not provided'}</p>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Experience (Years)</label>
+                                    {isEditing ? (
+                                        <input
+                                            type="number"
+                                            value={formData.doctorProfile?.experienceYears || ''}
+                                            onChange={(e) => handleInputChange('experienceYears', Number(e.target.value))}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        />
+                                    ) : (
+                                        <p className="text-gray-900">{profileData.doctorProfile?.experienceYears || 0} years</p>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Consultation Fee (₹)</label>
+                                    {isEditing ? (
+                                        <input
+                                            type="number"
+                                            value={formData.doctorProfile?.consultationFee || ''}
+                                            onChange={(e) => handleInputChange('consultationFee', Number(e.target.value))}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        />
+                                    ) : (
+                                        <p className="text-gray-900">₹{profileData.doctorProfile?.consultationFee || 0}</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Clinic Address */}
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                        <div className="flex items-center space-x-2 mb-4">
+                            <MapPin className="w-5 h-5 text-blue-600" />
+                            <h2 className="text-lg font-semibold text-gray-900">Clinic Address</h2>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Clinic Address</label>
+                                {isEditing ? (
+                                    <input
+                                        type="text"
+                                        value={formData.doctorProfile?.clinicAddress?.address || ''}
+                                        onChange={(e) => handleInputChange('address', e.target.value, 'clinicAddress')}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                ) : (
+                                    <p className="text-gray-900">{profileData.doctorProfile?.clinicAddress?.address || 'Not provided'}</p>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                                    {isEditing ? (
+                                        <input
+                                            type="text"
+                                            value={formData.doctorProfile?.clinicAddress?.city || ''}
+                                            onChange={(e) => handleInputChange('city', e.target.value, 'clinicAddress')}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        />
+                                    ) : (
+                                        <p className="text-gray-900">{profileData.doctorProfile?.clinicAddress?.city || 'Not provided'}</p>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                                    {isEditing ? (
+                                        <input
+                                            type="text"
+                                            value={formData.doctorProfile?.clinicAddress?.state || ''}
+                                            onChange={(e) => handleInputChange('state', e.target.value, 'clinicAddress')}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        />
+                                    ) : (
+                                        <p className="text-gray-900">{profileData.doctorProfile?.clinicAddress?.state || 'Not provided'}</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">PIN Code</label>
+                                    {isEditing ? (
+                                        <input
+                                            type="text"
+                                            value={formData.doctorProfile?.clinicAddress?.pincode || ''}
+                                            onChange={(e) => handleInputChange('pincode', e.target.value, 'clinicAddress')}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        />
+                                    ) : (
+                                        <p className="text-gray-900">{profileData.doctorProfile?.clinicAddress?.pincode || 'Not provided'}</p>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                                    {isEditing ? (
+                                        <input
+                                            type="text"
+                                            value={formData.doctorProfile?.clinicAddress?.country || ''}
+                                            onChange={(e) => handleInputChange('country', e.target.value, 'clinicAddress')}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        />
+                                    ) : (
+                                        <p className="text-gray-900">{profileData.doctorProfile?.clinicAddress?.country || 'Not provided'}</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Bio & Availability */}
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                        <div className="flex items-center space-x-2 mb-4">
+                            <Award className="w-5 h-5 text-blue-600" />
+                            <h2 className="text-lg font-semibold text-gray-900">Bio & Description</h2>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Professional Bio</label>
+                                {isEditing ? (
+                                    <textarea
+                                        value={formData.doctorProfile?.bio || ''}
+                                        onChange={(e) => handleInputChange('bio', e.target.value)}
+                                        rows={5}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="Share your experience, expertise, and approach to patient care..."
+                                    />
+                                ) : (
+                                    <p className="text-gray-900 whitespace-pre-wrap">{profileData.doctorProfile?.bio || 'No bio provided'}</p>
+                                )}
+                            </div>
+
+                            {isEditing && (
+                                <div>
+                                    <label className="flex items-center space-x-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.doctorProfile?.isAvailableForConsultation || false}
+                                            onChange={(e) => handleInputChange('isAvailableForConsultation', e.target.checked)}
+                                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                        />
+                                        <span className="text-sm font-medium text-gray-700">Available for Consultation</span>
+                                    </label>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Statistics & Availability */}
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                        <div className="flex items-center space-x-2 mb-4">
+                            <Clock className="w-5 h-5 text-blue-600" />
+                            <h2 className="text-lg font-semibold text-gray-900">Availability & Stats</h2>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Available Days</label>
+                                {isEditing ? (
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {daysOfWeek.map(day => (
+                                            <label key={day} className="flex items-center space-x-2 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={(formData.doctorProfile?.availableDays || []).includes(day)}
+                                                    onChange={() => toggleAvailableDay(day)}
+                                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                />
+                                                <span className="text-sm text-gray-700">{day}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-wrap gap-2">
+                                        {profileData.doctorProfile?.availableDays?.length > 0 ? (
+                                            profileData.doctorProfile.availableDays.map((day, index) => (
+                                                <span
+                                                    key={index}
+                                                    className="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm"
+                                                >
+                                                    {day}
+                                                </span>
+                                            ))
+                                        ) : (
+                                            <p className="text-gray-500">No available days set</p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="pt-4 border-t border-gray-200">
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="text-center">
+                                        <div className="flex items-center justify-center mb-1">
+                                            <Star className="w-5 h-5 text-yellow-500 fill-current" />
+                                        </div>
+                                        <p className="text-2xl font-bold text-gray-900">{profileData.doctorProfile?.rating?.toFixed(1) || '0.0'}</p>
+                                        <p className="text-xs text-gray-600">Rating</p>
+                                        <p className="text-xs text-gray-500">({profileData.doctorProfile?.totalRatings || 0} reviews)</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="flex items-center justify-center mb-1">
+                                            <Calendar className="w-5 h-5 text-blue-500" />
+                                        </div>
+                                        <p className="text-2xl font-bold text-gray-900">{profileData.doctorProfile?.totalConsultations || 0}</p>
+                                        <p className="text-xs text-gray-600">Consultations</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="flex items-center justify-center mb-1">
+                                            <Shield className="w-5 h-5 text-green-500" />
+                                        </div>
+                                        <p className="text-sm font-bold text-gray-900 mt-3">
+                                            {profileData.doctorProfile?.isAvailableForConsultation ? 'Available' : 'Unavailable'}
+                                        </p>
+                                        <p className="text-xs text-gray-600">Status</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Save/Cancel Buttons */}
+                {isEditing && (
+                    <div className="mt-6 flex justify-end space-x-4">
+                        <button
+                            type="button"
+                            onClick={handleCancel}
+                            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleSave}
+                            disabled={saving}
+                            className="flex items-center space-x-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                        >
+                            {saving ? (
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                                <Save className="w-4 h-4" />
+                            )}
+                            <span>{saving ? 'Saving...' : 'Save Changes'}</span>
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+export default DoctorProfile;

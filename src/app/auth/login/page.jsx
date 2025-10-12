@@ -32,7 +32,7 @@ export default function LoginForm() {
                 router.push("/doctor/dashboard")
             }
             else if (response.data.profileCompleted === true && response.data.role === "patient") {
-                router.push("/patient")
+                router.push("/patient/dashboard")
             } else {
                 router.push("/patient/profile")
             }

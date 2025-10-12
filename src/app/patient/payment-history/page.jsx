@@ -22,7 +22,7 @@ export default function PaymentHistoryPage() {
     const fetchPaymentHistory = async () => {
         try {
             setLoading(true)
-            toast.loading("Loading payment history...", { id: "fetch-payments" })
+
 
             // Get all appointments for the patient
             const response = await fetch("/api/appointments?role=patient")
@@ -71,7 +71,7 @@ export default function PaymentHistoryPage() {
 
     const downloadReceipt = async (appointmentId) => {
         try {
-            toast.loading("Generating receipt...", { id: "download-receipt" })
+
 
             const response = await fetch(`/api/appointments/${appointmentId}/receipt`)
 

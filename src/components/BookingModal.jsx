@@ -45,7 +45,7 @@ export default function BookingModal({ doctor, selectedDate, selectedSlot, onClo
         try {
             setLoading(true)
             console.log("Starting booking process")
-            toast.loading("Preparing your appointment...")
+
 
             // STEP 1: Create payment order FIRST (without creating appointment)
             const paymentResponse = await axios.post("/api/payments/create-order", {
@@ -81,7 +81,7 @@ export default function BookingModal({ doctor, selectedDate, selectedSlot, onClo
                     order_id: paymentResponse.data.order.id,
                     handler: async (response) => {
                         try {
-                            toast.loading("Verifying payment and booking appointment...")
+
 
                             // STEP 3: Verify payment AND create appointment in one call
                             const verifyResponse = await axios.post("/api/payments/verify-and-book", {

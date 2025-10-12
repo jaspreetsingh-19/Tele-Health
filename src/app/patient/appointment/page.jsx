@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
-import { useRouter } from 'next/navigation'
+import { useRouter } from "next/navigation"
 
 export default function PatientAppointmentsPage() {
     const router = useRouter()
@@ -44,7 +44,7 @@ export default function PatientAppointmentsPage() {
                 setAppointments(filteredAppointments)
             }
         } catch (error) {
-            console.error('Error fetching appointments:', error)
+            console.error("Error fetching appointments:", error)
             toast.error("Failed to fetch appointments")
         } finally {
             setLoading(false)
@@ -53,8 +53,8 @@ export default function PatientAppointmentsPage() {
 
     const cancelAppointment = async (appointmentId) => {
         try {
-            const appointment = appointments.find(apt => apt._id === appointmentId)
-            let response;
+            const appointment = appointments.find((apt) => apt._id === appointmentId)
+            let response
 
             if (appointment.paymentStatus === "paid") {
                 // Call refund route
@@ -67,27 +67,27 @@ export default function PatientAppointmentsPage() {
                         appointmentId: appointment._id,
                         reason: "User cancelled",
                     }),
-                });
+                })
             } else {
                 // Call simple delete route
                 response = await fetch(`/api/appointments/${appointment._id}`, {
                     method: "DELETE",
-                });
+                })
             }
 
-            const data = await response.json();
+            const data = await response.json()
 
             if (response.ok && data.success) {
                 toast.success("Appointment cancelled successfully")
-                fetchAppointments();
+                fetchAppointments()
             } else {
                 toast.error(data.message || "Failed to cancel appointment")
             }
         } catch (error) {
-            console.error("Error cancelling appointment:", error);
+            console.error("Error cancelling appointment:", error)
             toast.error("Something went wrong")
         }
-    };
+    }
 
     // Fixed date comparison functions
     const getTodayAppointments = () => {
@@ -135,8 +135,12 @@ export default function PatientAppointmentsPage() {
                     <p className="text-muted-foreground text-sm sm:text-base">View and manage your healthcare appointments</p>
                 </div>
                 <div className="flex items-center gap-2 sm:gap-3">
-                    <Badge className="bg-primary text-primary-foreground text-xs sm:text-sm">{todayAppointments.length} Today</Badge>
-                    <Badge className="bg-accent text-accent-foreground text-xs sm:text-sm">{upcomingAppointments.length} Upcoming</Badge>
+                    <Badge className="bg-primary text-primary-foreground text-xs sm:text-sm">
+                        {todayAppointments.length} Today
+                    </Badge>
+                    <Badge className="bg-accent text-accent-foreground text-xs sm:text-sm">
+                        {upcomingAppointments.length} Upcoming
+                    </Badge>
                 </div>
             </div>
 
@@ -208,9 +212,15 @@ export default function PatientAppointmentsPage() {
 
             <Tabs defaultValue="today" className="space-y-4 sm:space-y-6">
                 <TabsList className="grid w-full grid-cols-3 h-auto">
-                    <TabsTrigger value="today" className="text-xs sm:text-sm">Today's</TabsTrigger>
-                    <TabsTrigger value="upcoming" className="text-xs sm:text-sm">Upcoming</TabsTrigger>
-                    <TabsTrigger value="all" className="text-xs sm:text-sm">All</TabsTrigger>
+                    <TabsTrigger value="today" className="text-xs sm:text-sm">
+                        Today's
+                    </TabsTrigger>
+                    <TabsTrigger value="upcoming" className="text-xs sm:text-sm">
+                        Upcoming
+                    </TabsTrigger>
+                    <TabsTrigger value="all" className="text-xs sm:text-sm">
+                        All
+                    </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="today">
@@ -301,6 +311,11 @@ export default function PatientAppointmentsPage() {
 
 function PatientAppointmentCard({ appointment, onCancel, onNavigateToChat, onNavigateToVideoCall }) {
     const [copiedRoomId, setCopiedRoomId] = useState(false)
+    const [, forceTimeTick] = useState(0)
+    useEffect(() => {
+        const id = setInterval(() => forceTimeTick((t) => t + 1), 30000)
+        return () => clearInterval(id)
+    }, [])
 
     // Fixed date formatting function
     const formatDate = (dateString) => {
@@ -357,25 +372,35 @@ function PatientAppointmentCard({ appointment, onCancel, onNavigateToChat, onNav
             setTimeout(() => setCopiedRoomId(false), 2000)
             toast.success("Room ID copied to clipboard")
         } catch (err) {
-            console.error('Failed to copy room ID:', err)
+            console.error("Failed to copy room ID:", err)
             toast.error("Failed to copy room ID")
         }
     }
 
     const canStartChat = () => {
-        if (appointment.status !== 'scheduled') return false
-        if (appointment.consultationType !== 'chat') return false
+        if (appointment.status !== "scheduled") return false
+        if (appointment.consultationType !== "chat") return false
 
-        const appointmentDate = new Date(appointment.appointmentDate)
-        const now = new Date()
+        const start = new Date(appointment.appointmentDate)
+        const [h, m] = String(appointment.timeSlot?.startTime || "00:00")
+            .split(":")
+            .map(Number)
+        start.setHours(h || 0, m || 0, 0, 0)
 
-        // Allow starting chat on the same day
-        const appointmentDay = new Date(appointmentDate)
-        appointmentDay.setHours(0, 0, 0, 0)
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
+        return Date.now() >= start.getTime() - 15 * 60 * 1000
+    }
 
-        return appointmentDay.getTime() === today.getTime()
+    const canJoinVideo = () => {
+        if (appointment.status !== "scheduled") return false
+        if (appointment.consultationType !== "video") return false
+
+        const start = new Date(appointment.appointmentDate)
+        const [h, m] = String(appointment.timeSlot?.startTime || "00:00")
+            .split(":")
+            .map(Number)
+        start.setHours(h || 0, m || 0, 0, 0)
+
+        return Date.now() >= start.getTime() - 15 * 60 * 1000
     }
 
     return (
@@ -416,7 +441,9 @@ function PatientAppointmentCard({ appointment, onCancel, onNavigateToChat, onNav
                             </div>
                             <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
                                 <Clock className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                                <span>{formatTime(appointment.timeSlot.startTime)} - {formatTime(appointment.timeSlot.endTime)}</span>
+                                <span>
+                                    {formatTime(appointment.timeSlot.startTime)} - {formatTime(appointment.timeSlot.endTime)}
+                                </span>
                             </div>
                             <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
                                 {appointment.consultationType === "video" ? (
@@ -444,15 +471,13 @@ function PatientAppointmentCard({ appointment, onCancel, onNavigateToChat, onNav
                                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                                     <div className="min-w-0 flex-1">
                                         <span className="text-xs sm:text-sm font-medium">Meeting Room ID:</span>
-                                        <div className="text-xs text-muted-foreground font-mono mt-1 break-all">
-                                            {appointment.roomId}
-                                        </div>
+                                        <div className="text-xs text-muted-foreground font-mono mt-1 break-all">{appointment.roomId}</div>
                                     </div>
                                     <Button
                                         size="sm"
                                         variant="outline"
                                         onClick={copyRoomId}
-                                        className="w-full sm:w-auto sm:ml-2 text-xs"
+                                        className="w-full sm:w-auto sm:ml-2 text-xs bg-transparent"
                                     >
                                         {copiedRoomId ? (
                                             <Check className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -483,6 +508,8 @@ function PatientAppointmentCard({ appointment, onCancel, onNavigateToChat, onNav
                                 variant="outline"
                                 className="hover:bg-primary hover:text-primary-foreground bg-transparent text-xs sm:text-sm w-full"
                                 onClick={() => onNavigateToVideoCall(appointment.appointmentId)}
+                                disabled={!canJoinVideo()}
+                                title={!canJoinVideo() ? "Available 15 minutes before start time" : undefined}
                             >
                                 <Video className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                                 Join Call
@@ -496,9 +523,10 @@ function PatientAppointmentCard({ appointment, onCancel, onNavigateToChat, onNav
                                 className="hover:bg-primary hover:text-primary-foreground bg-transparent text-xs sm:text-sm w-full"
                                 onClick={() => onNavigateToChat(appointment._id)}
                                 disabled={!canStartChat()}
+                                title={!canStartChat() ? "Available 15 minutes before start time" : undefined}
                             >
                                 <MessageCircle className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                                {canStartChat() ? 'Start Chat' : 'Chat'}
+                                {canStartChat() ? "Start Chat" : "Chat"}
                             </Button>
                         )}
                     </div>

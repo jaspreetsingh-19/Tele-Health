@@ -18,9 +18,20 @@ import {
   ChevronRight,
   Check
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+
 
 const TelehealthLanding = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const router = useRouter()
+
+  function handleLogin() {
+    router.push("/auth/login")
+
+  }
+  function handleGetStarted() {
+    router.push("/auth/signup")
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -41,8 +52,8 @@ const TelehealthLanding = () => {
               <a href="#services" className="text-gray-600 hover:text-blue-600 transition-colors">Services</a>
               <a href="#about" className="text-gray-600 hover:text-blue-600 transition-colors">About</a>
               <a href="#contact" className="text-gray-600 hover:text-blue-600 transition-colors">Contact</a>
-              <button className="text-blue-600 hover:text-blue-700 font-medium">Login</button>
-              <button className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+              <button className="text-blue-600 hover:text-blue-700 font-medium" onClick={handleLogin}>Login</button>
+              <button className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors" onClick={handleGetStarted}>
                 Get Started
               </button>
             </div>

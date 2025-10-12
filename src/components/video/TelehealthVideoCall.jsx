@@ -19,8 +19,9 @@ import {
     Maximize2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { io } from 'socket.io-client';
 
-const server_url = "ws://localhost:3000";
+const server_url = "http://localhost:3000";
 
 const rtcConfiguration = {
     iceServers: [
@@ -109,39 +110,42 @@ export default function TelehealthVideoCall({
             toast.success('Camera and microphone ready', { id: 'init-call' });
 
             // Initialize Socket.IO connection
-            const socket = new WebSocket(server_url.replace('ws://', 'ws://'));
+            const socket = io(server_url, {
+                transports: ['websocket', 'polling'],
+                reconnection: true,
+                reconnectionDelay: 1000,
+                reconnectionAttempts: 5,
+            });
 
-            // Mock socket implementation for demo
-            const mockSocket = {
-                emit: (event, data) => {
-                    console.log(`[SOCKET] Emitting ${event}:`, data);
-                    if (event === 'join-video-call') {
-                        setTimeout(() => {
-                            toast.success('Connected to call room');
-                            setIsConnected(true);
-                            setCallStatus('ringing');
-                        }, 1000);
-                    }
-                },
-                on: (event, callback) => {
-                    console.log(`[SOCKET] Listening for ${event}`);
-                },
-                disconnect: () => {
-                    console.log('[SOCKET] Disconnecting');
-                    setIsConnected(false);
+            socketRef.current = socket;
+            setupSocketListeners(socket);
+
+            // Wait for socket connection
+            socket.on('connect', () => {
+                console.log('[SOCKET] Connected to server, socket ID:', socket.id);
+                toast.success('Connected to call server');
+                setIsConnected(true);
+
+                // Join the video call room
+                socket.emit('join-video-call', {
+                    callId,
+                    userId,
+                    username
+                });
+            });
+
+            socket.on('connect_error', (error) => {
+                console.error('[SOCKET] Connection error:', error);
+                toast.error('Failed to connect to call server. Is the server running?');
+                setCallStatus('failed');
+            });
+
+            socket.on('disconnect', (reason) => {
+                console.log('[SOCKET] Disconnected from server:', reason);
+                setIsConnected(false);
+                if (reason === 'io server disconnect') {
+                    socket.connect();
                 }
-            };
-
-            socketRef.current = mockSocket;
-            setupSocketListeners(mockSocket);
-
-            // Join the video call room
-            mockSocket.emit('join-video-call', {
-                roomId,
-                callId,
-                userId,
-                username,
-                userType
             });
 
         } catch (error) {
@@ -152,13 +156,152 @@ export default function TelehealthVideoCall({
     };
 
     const setupSocketListeners = (socket) => {
-        // Mock socket listeners for demo
-        setTimeout(() => {
-            if (callStatus === 'ringing') {
-                toast.success('Other participant joined the call');
-                setCallStatus('connected');
+        // Handle successful join
+        socket.on('video-call-joined', ({ callId: joinedCallId, callStatus: status, participantCount, otherParticipants, messages: historyMessages }) => {
+            console.log('[SOCKET] Video call joined:', { joinedCallId, status, participantCount, otherParticipants });
+            setCallStatus(status === 'connected' ? 'connected' : 'ringing');
+
+            // Load message history
+            if (historyMessages && historyMessages.length > 0) {
+                const formattedMessages = historyMessages.map(msg => ({
+                    id: msg.messageId || msg.timestamp?.toString() || Date.now().toString(),
+                    content: msg.content,
+                    sender: msg.sender,
+                    senderId: msg.senderId,
+                    senderRole: msg.senderRole,
+                    timestamp: new Date(msg.timestamp || Date.now()).toLocaleTimeString(),
+                    isOwn: msg.senderId === userId,
+                }));
+                setMessages(formattedMessages);
             }
-        }, 3000);
+
+            // If there are other participants, prepare for WebRTC
+            if (otherParticipants && otherParticipants.length > 0) {
+                targetUserIdRef.current = otherParticipants[0].userId;
+            }
+        });
+
+        // Handle other user joining
+        socket.on('user-joined-video', ({ userId: joinedUserId, username: joinedUsername, callStatus: status, participantCount }) => {
+            console.log('[SOCKET] User joined video:', joinedUsername, joinedUserId);
+            toast.success(`${joinedUsername} joined the call`);
+            setCallStatus(status === 'connected' ? 'connected' : 'ringing');
+
+            targetUserIdRef.current = joinedUserId;
+        });
+
+        // Handle WebRTC initiation signal
+        socket.on('initiate-webrtc', ({ targetUserId, targetUsername, role }) => {
+            console.log('[SOCKET] Initiate WebRTC as', role, 'to', targetUsername);
+            targetUserIdRef.current = targetUserId;
+            isInitiatorRef.current = (role === 'caller');
+
+            if (isInitiatorRef.current) {
+                console.log('[RTC] Acting as caller, making offer');
+                setTimeout(() => makeOffer(targetUserId), 500);
+            }
+        });
+
+        socket.on('webrtc-ready', ({ targetUserId, targetUsername, role }) => {
+            console.log('[SOCKET] WebRTC ready as', role, 'with', targetUsername);
+            targetUserIdRef.current = targetUserId;
+            isInitiatorRef.current = (role === 'caller');
+        });
+
+        // Handle WebRTC offer
+        socket.on('webrtc-offer', async ({ offer, fromUserId, fromUsername }) => {
+            console.log('[SOCKET] Received offer from:', fromUsername, fromUserId);
+            await handleOffer(offer, fromUserId);
+        });
+
+        // Handle WebRTC answer
+        socket.on('webrtc-answer', async ({ answer, fromUserId, fromUsername }) => {
+            console.log('[SOCKET] Received answer from:', fromUsername, fromUserId);
+            await handleAnswer(answer);
+        });
+
+        // Handle ICE candidates
+        socket.on('webrtc-ice-candidate', async ({ candidate, fromUserId }) => {
+            console.log('[SOCKET] Received ICE candidate from:', fromUserId);
+            await handleRemoteIceCandidate(candidate);
+        });
+
+        // Handle user left
+        socket.on('user-left-video', ({ userId: leftUserId, username: leftUsername, participantCount }) => {
+            console.log('[SOCKET] User left video:', leftUsername);
+            toast.info(`${leftUsername} left the call`);
+            if (participantCount === 0) {
+                setCallStatus('ended');
+            } else {
+                setCallStatus('ringing');
+            }
+        });
+
+        // Handle chat messages
+        socket.on('receiveVideoMessage', (messageData) => {
+            console.log('[SOCKET] Received video message:', messageData);
+            if (messageData.senderId !== userId) {
+                const message = {
+                    id: messageData.messageId || messageData.timestamp?.toString() || Date.now().toString(),
+                    content: messageData.content,
+                    sender: messageData.sender,
+                    senderId: messageData.senderId,
+                    senderRole: messageData.senderRole,
+                    timestamp: new Date(messageData.timestamp || Date.now()).toLocaleTimeString(),
+                    isOwn: false,
+                };
+                setMessages(prev => [...prev, message]);
+                toast.success('New message received');
+            }
+        });
+
+        // Handle message sent confirmation
+        socket.on('videoMessageSent', ({ messageId, timestamp }) => {
+            console.log('[SOCKET] Video message sent confirmation:', messageId);
+        });
+
+        // Handle typing indicator
+        socket.on('videoTyping', ({ userId: typingUserId, username: typingUsername, isTyping: typing }) => {
+            if (typingUserId !== userId) {
+                setIsTyping(typing);
+            }
+        });
+
+        // Handle errors
+        socket.on('video-error', ({ message }) => {
+            console.error('[SOCKET] Video error:', message);
+            toast.error(message);
+            setCallStatus('failed');
+        });
+
+        socket.on('videoMessageError', ({ error }) => {
+            console.error('[SOCKET] Video message error:', error);
+            toast.error('Failed to send message');
+        });
+    };
+
+    const makeOffer = async (targetUserId) => {
+        const pc = createPeerConnection();
+        targetUserIdRef.current = targetUserId;
+        makingOfferRef.current = true;
+
+        try {
+            console.log('[RTC] Creating offer');
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            console.log('[RTC] Sending offer to:', targetUserId);
+            socketRef.current?.emit('webrtc-offer', {
+                callId,
+                offer,
+                targetUserId,
+            });
+        } catch (error) {
+            console.error('[RTC] Error making offer:', error);
+            toast.error('Failed to establish connection');
+        } finally {
+            makingOfferRef.current = false;
+        }
     };
 
     const createPeerConnection = () => {
@@ -171,13 +314,14 @@ export default function TelehealthVideoCall({
         // Add local stream tracks
         if (localStreamRef.current) {
             localStreamRef.current.getTracks().forEach(track => {
+                console.log('[RTC] Adding track:', track.kind);
                 pc.addTrack(track, localStreamRef.current);
             });
         }
 
         // Handle remote stream
         pc.ontrack = (event) => {
-            console.log('[RTC] Received remote track');
+            console.log('[RTC] Received remote track:', event.track.kind);
             const [remoteStream] = event.streams;
             if (remoteVideoRef.current && remoteStream) {
                 remoteVideoRef.current.srcObject = remoteStream;
@@ -221,6 +365,10 @@ export default function TelehealthVideoCall({
             }
         };
 
+        pc.onsignalingstatechange = () => {
+            console.log('[RTC] Signaling state:', pc.signalingState);
+        };
+
         return pc;
     };
 
@@ -229,6 +377,8 @@ export default function TelehealthVideoCall({
         targetUserIdRef.current = fromUserId;
 
         try {
+            console.log('[RTC] Handling offer, current signaling state:', pc.signalingState);
+
             if (pc.signalingState === 'have-local-offer') {
                 if (userId > fromUserId) {
                     console.log('[RTC] Ignoring offer due to glare (we win)');
@@ -239,9 +389,12 @@ export default function TelehealthVideoCall({
                 }
             }
 
-            await pc.setRemoteDescription(offer);
+            await pc.setRemoteDescription(new RTCSessionDescription(offer));
+            console.log('[RTC] Remote description set, creating answer');
+
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
+            console.log('[RTC] Sending answer');
 
             socketRef.current?.emit('webrtc-answer', {
                 callId,
@@ -258,13 +411,20 @@ export default function TelehealthVideoCall({
 
     const handleAnswer = async (answer) => {
         const pc = pcRef.current;
-        if (!pc) return;
+        if (!pc) {
+            console.warn('[RTC] No peer connection to handle answer');
+            return;
+        }
 
         try {
+            console.log('[RTC] Handling answer, current signaling state:', pc.signalingState);
+
             if (pc.signalingState === 'have-local-offer') {
-                await pc.setRemoteDescription(answer);
+                await pc.setRemoteDescription(new RTCSessionDescription(answer));
                 await flushPendingCandidates();
                 console.log('[RTC] Answer applied successfully');
+            } else {
+                console.warn('[RTC] Cannot set answer, signaling state is:', pc.signalingState);
             }
         } catch (error) {
             console.error('[RTC] Error handling answer:', error);
@@ -276,12 +436,13 @@ export default function TelehealthVideoCall({
         const pc = pcRef.current;
 
         if (!pc || !pc.remoteDescription) {
+            console.log('[RTC] Queueing ICE candidate (no remote description yet)');
             pendingCandidatesRef.current.push(new RTCIceCandidate(candidate));
             return;
         }
 
         try {
-            await pc.addIceCandidate(candidate);
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
             console.log('[RTC] ICE candidate added');
         } catch (error) {
             console.error('[RTC] Error adding ICE candidate:', error);
@@ -293,6 +454,8 @@ export default function TelehealthVideoCall({
         if (!pc || !pc.remoteDescription) return;
 
         const candidates = pendingCandidatesRef.current.splice(0);
+        console.log('[RTC] Flushing', candidates.length, 'pending ICE candidates');
+
         for (const candidate of candidates) {
             try {
                 await pc.addIceCandidate(candidate);
@@ -321,6 +484,9 @@ export default function TelehealthVideoCall({
     };
 
     const endCall = () => {
+        if (socketRef.current) {
+            socketRef.current.emit('leave-video-call', { callId });
+        }
         cleanup();
         toast.success('Call ended');
         onCallEnd?.();
@@ -330,13 +496,17 @@ export default function TelehealthVideoCall({
         console.log('[CLEANUP] Cleaning up call resources');
 
         // Stop local tracks
-        localStreamRef.current?.getTracks().forEach(track => track.stop());
+        localStreamRef.current?.getTracks().forEach(track => {
+            track.stop();
+            console.log('[CLEANUP] Stopped track:', track.kind);
+        });
         localStreamRef.current = null;
 
         // Close peer connection
         if (pcRef.current) {
             pcRef.current.close();
             pcRef.current = null;
+            console.log('[CLEANUP] Closed peer connection');
         }
 
         // Clean up refs
@@ -346,9 +516,9 @@ export default function TelehealthVideoCall({
 
         // Disconnect socket
         if (socketRef.current) {
-            socketRef.current.emit?.('leave-video-call', { callId });
-            socketRef.current.disconnect?.();
+            socketRef.current.disconnect();
             socketRef.current = null;
+            console.log('[CLEANUP] Disconnected socket');
         }
 
         setCallStatus('ended');
@@ -360,10 +530,10 @@ export default function TelehealthVideoCall({
 
         const messageData = {
             callId,
-            content: newMessage,
-            sender: username,
             senderId: userId,
+            sender: username,
             senderRole: userType,
+            content: newMessage,
             type: 'text',
             timestamp: Date.now(),
         };
@@ -380,15 +550,14 @@ export default function TelehealthVideoCall({
         };
 
         setMessages(prev => [...prev, message]);
-        socketRef.current.emit?.('sendVideoMessage', messageData);
+        socketRef.current.emit('sendVideoMessage', messageData);
         setNewMessage('');
-        toast.success('Message sent');
     };
 
     const handleTyping = (typing) => {
         if (socketRef.current) {
-            socketRef.current.emit?.('typing', {
-                roomId: callId,
+            socketRef.current.emit('videoTyping', {
+                callId,
                 userId,
                 isTyping: typing,
             });
@@ -481,8 +650,8 @@ export default function TelehealthVideoCall({
 
                 {/* Local Video (Picture-in-Picture) */}
                 <div className={`absolute transition-all duration-300 ${isLocalVideoMinimized
-                        ? 'top-4 right-4 w-20 h-16 md:w-24 md:h-18'
-                        : 'top-4 right-4 w-32 h-24 md:w-64 md:h-48'
+                    ? 'top-4 right-4 w-20 h-16 md:w-24 md:h-18'
+                    : 'top-4 right-4 w-32 h-24 md:w-64 md:h-48'
                     } bg-gray-800 border-2 border-white rounded-lg md:rounded-xl overflow-hidden shadow-xl z-10`}>
                     <video
                         ref={localVideoRef}
@@ -530,7 +699,7 @@ export default function TelehealthVideoCall({
                                         <Video className="w-6 h-6 md:w-8 md:h-8 text-white" />
                                     </div>
                                     <h3 className="text-lg md:text-xl font-semibold text-gray-900">
-                                        {userType === 'doctor' ? 'Calling Patient...' : 'Calling Doctor...'}
+                                        {userType === 'doctor' ? 'Waiting for Patient...' : 'Waiting for Doctor...'}
                                     </h3>
                                     <p className="text-sm md:text-base text-gray-600">Waiting for {otherUser.username} to join</p>
                                 </div>
@@ -539,7 +708,9 @@ export default function TelehealthVideoCall({
                                 <div className="space-y-4">
                                     <AlertCircle className="w-12 h-12 md:w-16 md:h-16 text-red-500 mx-auto" />
                                     <h3 className="text-lg md:text-xl font-semibold text-gray-900">Connection Failed</h3>
-                                    <p className="text-sm md:text-base text-gray-600">Please check your connection and try again</p>
+                                    <p className="text-sm md:text-base text-gray-600">
+                                        {!isConnected ? 'Could not connect to server. Please check if the server is running.' : 'Please check your connection and try again'}
+                                    </p>
                                     <button
                                         onClick={endCall}
                                         className="px-4 py-2 md:px-6 md:py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm md:text-base"
@@ -597,7 +768,7 @@ export default function TelehealthVideoCall({
 
             {/* Chat Panel */}
             {showChat && (
-                <div className={`fixed ${window.innerWidth < 768 ? 'inset-0' : 'right-0 top-0 h-full w-80 lg:w-96'} bg-white ${window.innerWidth < 768 ? '' : 'border-l border-gray-200'} flex flex-col shadow-2xl z-50 transform transition-transform duration-300`}>
+                <div className={`fixed ${typeof window !== 'undefined' && window.innerWidth < 768 ? 'inset-0' : 'right-0 top-0 h-full w-80 lg:w-96'} bg-white ${typeof window !== 'undefined' && window.innerWidth < 768 ? '' : 'border-l border-gray-200'} flex flex-col shadow-2xl z-50 transform transition-transform duration-300`}>
                     <div className="p-3 md:p-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-white flex-shrink-0">
                         <div className="flex justify-between items-center">
                             <h3 className="font-semibold text-gray-900 text-lg">Chat</h3>

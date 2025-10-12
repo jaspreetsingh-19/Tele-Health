@@ -406,7 +406,7 @@ export default function DoctorChatWithPatient() {
 
     if (!user || authError) {
         console.log("Auth failed, redirecting to login. User:", user, "Error:", authError)
-        router.push("/login")
+        router.push("/auth/login")
         return null
     }
 

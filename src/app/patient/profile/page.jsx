@@ -1,267 +1,440 @@
 "use client"
-import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { User, Phone, MapPin, Calendar, FileText, Stethoscope } from 'lucide-react';
-import axios from "axios"
+import { useState, useEffect } from 'react';
+import { User, Edit2, Calendar, Phone, MapPin, Heart, AlertCircle, Save, X } from 'lucide-react';
+import axios from 'axios';
 import { useRouter } from 'next/navigation';
 
-export default function PatientProfile() {
-    const [formData, setFormData] = useState({
-        fullName: '',
-        gender: '',
-        dateOfBirth: '',
-        phoneNumber: '',
-        address: '',
-        medicalHistory: ''
-    });
+export default function PatientDashboard() {
+    const [user, setUser] = useState(null);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editForm, setEditForm] = useState({});
+    const [loading, setLoading] = useState(true);
+    const router = useRouter();
 
-    const [errors, setErrors] = useState({});
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const router = useRouter()
+    // Set up axios defaults to include cookies
+    useEffect(() => {
+        axios.defaults.withCredentials = true;
+    }, []);
+
+    useEffect(() => {
+        fetchUserProfile();
+    }, []);
+
+    const fetchUserProfile = async () => {
+        try {
+            const response = await axios.get('/api/dashboard');
+            if (response.data.success) {
+                setUser(response.data.user);
+                setEditForm(response.data.user.profile || {});
+            }
+        } catch (error) {
+            console.error('Error fetching profile:', error);
+            // Handle authentication error
+            if (error.response?.status === 401) {
+                router.push("/auth/login");
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleUpdateProfile = async () => {
+        try {
+            const response = await axios.put('/api/dashboard', {
+                profile: editForm
+            });
+
+            if (response.data.success) {
+                setUser(response.data.user);
+                setIsEditing(false);
+                // Show success message
+                alert('Profile updated successfully!');
+            }
+        } catch (error) {
+            console.error('Error updating profile:', error);
+            alert('Failed to update profile. Please try again.');
+        }
+    };
 
     const handleInputChange = (field, value) => {
-        setFormData(prev => ({
-            ...prev,
-            [field]: value
-        }));
-
-        // Clear error when user starts typing
-        if (errors[field]) {
-            setErrors(prev => ({ ...prev, [field]: null }));
+        if (field.includes('.')) {
+            const [parent, child] = field.split('.');
+            setEditForm(prev => ({
+                ...prev,
+                [parent]: {
+                    ...prev[parent],
+                    [child]: value
+                }
+            }));
+        } else {
+            setEditForm(prev => ({
+                ...prev,
+                [field]: value
+            }));
         }
     };
 
-    const validateForm = () => {
-        const newErrors = {};
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center py-12">
+                <div className="animate-pulse text-xl">Loading profile...</div>
+            </div>
+        );
+    }
 
-        if (!formData.fullName.trim()) newErrors.fullName = 'Full name is required';
-        if (!formData.gender) newErrors.gender = 'Gender is required';
-        if (!formData.dateOfBirth) newErrors.dateOfBirth = 'Date of birth is required';
-        if (!formData.phoneNumber.trim()) newErrors.phoneNumber = 'Phone number is required';
-        if (!formData.address.trim()) newErrors.address = 'Address is required';
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
-
-    const handleSubmit = async () => {
-        if (!validateForm()) return;
-
-        setIsSubmitting(true);
-        try {
-
-            const response = await axios.patch("http://localhost:3000/api/profile/patient", formData)
-            console.log("response", response)
-
-            console.log('Patient Profile Data:', formData);
-            alert('Patient profile created successfully!');
-            router.push("/patient")
-            setIsSubmitting(false);
-        } catch (error) {
-            console.log("error in profile patirnt ui", error)
-
-        } finally {
-            setIsSubmitting(false)
-        }
-    };
-
-    return (
-        <div className="min-h-screen bg-background py-8 px-4">
-            <div className="max-w-2xl mx-auto">
-                {/* Header */}
-                <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-muted rounded-full mb-4">
-                        <Stethoscope className="h-8 w-8 text-muted-foreground" />
-                    </div>
-                    <h1 className="text-3xl font-bold text-foreground mb-2">Patient Profile</h1>
-                    <p className="text-muted-foreground">Please complete your information for your telehealth record</p>
-                </div>
-
-                <div className="space-y-6">
-                    {/* Personal Information */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <User className="h-5 w-5" />
-                                Personal Information
-                            </CardTitle>
-                            <CardDescription>
-                                Basic personal details
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div>
-                                <Label htmlFor="fullName">
-                                    Full Name *
-                                </Label>
-                                <Input
-                                    id="fullName"
-                                    placeholder="Enter your full name"
-                                    value={formData.fullName}
-                                    onChange={(e) => handleInputChange('fullName', e.target.value)}
-                                    className={errors.fullName ? 'border-destructive' : ''}
-                                />
-                                {errors.fullName && (
-                                    <p className="text-destructive text-sm mt-1">{errors.fullName}</p>
-                                )}
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <Label htmlFor="gender">
-                                        Gender *
-                                    </Label>
-                                    <Select value={formData.gender} onValueChange={(value) => handleInputChange('gender', value)}>
-                                        <SelectTrigger className={errors.gender ? 'border-destructive' : ''}>
-                                            <SelectValue placeholder="Select gender" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="male">Male</SelectItem>
-                                            <SelectItem value="female">Female</SelectItem>
-                                            <SelectItem value="other">Other</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    {errors.gender && (
-                                        <p className="text-destructive text-sm mt-1">{errors.gender}</p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <Label htmlFor="dateOfBirth">
-                                        Date of Birth *
-                                    </Label>
-                                    <div className="relative">
-                                        <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                        <Input
-                                            id="dateOfBirth"
-                                            type="date"
-                                            value={formData.dateOfBirth}
-                                            onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
-                                            className={`pl-10 ${errors.dateOfBirth ? 'border-destructive' : ''}`}
-                                        />
-                                    </div>
-                                    {errors.dateOfBirth && (
-                                        <p className="text-destructive text-sm mt-1">{errors.dateOfBirth}</p>
-                                    )}
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Contact Information */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Phone className="h-5 w-5" />
-                                Contact Information
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div>
-                                <Label htmlFor="phoneNumber">
-                                    Phone Number *
-                                </Label>
-                                <div className="relative">
-                                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                    <Input
-                                        id="phoneNumber"
-                                        type="tel"
-                                        placeholder="+1 (555) 123-4567"
-                                        value={formData.phoneNumber}
-                                        onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-                                        className={`pl-10 ${errors.phoneNumber ? 'border-destructive' : ''}`}
-                                    />
-                                </div>
-                                {errors.phoneNumber && (
-                                    <p className="text-destructive text-sm mt-1">{errors.phoneNumber}</p>
-                                )}
-                            </div>
-
-                            <div>
-                                <Label htmlFor="address">
-                                    Address *
-                                </Label>
-                                <div className="relative">
-                                    <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                                    <Textarea
-                                        id="address"
-                                        placeholder="Enter your complete address"
-                                        value={formData.address}
-                                        onChange={(e) => handleInputChange('address', e.target.value)}
-                                        rows={3}
-                                        className={`pl-10 resize-none ${errors.address ? 'border-destructive' : ''}`}
-                                    />
-                                </div>
-                                {errors.address && (
-                                    <p className="text-destructive text-sm mt-1">{errors.address}</p>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Medical History */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <FileText className="h-5 w-5" />
-                                Medical History
-                            </CardTitle>
-                            <CardDescription>
-                                Please provide relevant medical information
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div>
-                                <Label htmlFor="medicalHistory">
-                                    Medical History
-                                </Label>
-                                <Textarea
-                                    id="medicalHistory"
-                                    placeholder="Please describe any medical conditions, allergies, medications, or previous surgeries..."
-                                    value={formData.medicalHistory}
-                                    onChange={(e) => handleInputChange('medicalHistory', e.target.value)}
-                                    rows={5}
-                                    className="resize-none"
-                                />
-                                <p className="text-sm text-muted-foreground mt-2">
-                                    Include allergies, current medications, chronic conditions, and family history
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Submit Button */}
-                    <div className="flex justify-center pt-4">
-                        <Button
-                            onClick={handleSubmit}
-                            disabled={isSubmitting}
-                            size="lg"
-                            className="w-full max-w-md"
-                        >
-                            {isSubmitting ? (
-                                <div className="flex items-center gap-2">
-                                    <div className="w-4 h-4 border-2 border-background border-t-foreground rounded-full animate-spin"></div>
-                                    Creating Profile...
-                                </div>
-                            ) : (
-                                'Create Patient Profile'
-                            )}
-                        </Button>
-                    </div>
-                </div>
-
-                {/* Footer */}
-                <div className="text-center mt-8">
-                    <p className="text-sm text-muted-foreground">
-                        Your information is secure and protected under HIPAA compliance
-                    </p>
+    if (!user) {
+        return (
+            <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                    <p className="text-lg text-muted-foreground">Unable to load profile</p>
+                    <button
+                        onClick={fetchUserProfile}
+                        className="mt-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+                    >
+                        Try Again
+                    </button>
                 </div>
             </div>
+        );
+    }
+
+    const profile = user?.profile || {};
+
+    return (
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                    <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-green-600 rounded-full flex items-center justify-center">
+                        <User className="text-white text-2xl" />
+                    </div>
+                    <div>
+                        <h1 className="text-3xl font-bold">Welcome, {profile.fullName || user?.username}</h1>
+                        <p className="text-muted-foreground">Manage your profile information</p>
+                    </div>
+                </div>
+                <button
+                    onClick={() => setIsEditing(!isEditing)}
+                    className={`flex items-center space-x-2 px-6 py-3 rounded-lg transition-all duration-200 font-medium ${isEditing
+                            ? 'bg-secondary hover:bg-secondary/80 text-secondary-foreground'
+                            : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                        }`}
+                >
+                    {isEditing ? <X size={20} /> : <Edit2 size={20} />}
+                    <span>{isEditing ? 'Cancel' : 'Edit Profile'}</span>
+                </button>
+            </div>
+
+            {/* Profile Sections */}
+            <div className="grid md:grid-cols-2 gap-6">
+                {/* Personal Information */}
+                <div className="border border-border rounded-lg p-6">
+                    <h2 className="text-xl font-semibold mb-6 flex items-center border-b border-border pb-3">
+                        <User className="mr-2" size={24} />
+                        Personal Information
+                    </h2>
+
+                    <div className="space-y-5">
+                        <div>
+                            <label className="block text-sm font-medium mb-2">Full Name</label>
+                            {isEditing ? (
+                                <input
+                                    type="text"
+                                    value={editForm.fullName || ''}
+                                    onChange={(e) => handleInputChange('fullName', e.target.value)}
+                                    className="w-full p-3 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-ring transition-colors"
+                                />
+                            ) : (
+                                <p className="p-3 bg-muted/30 rounded-lg">{profile.fullName || 'Not provided'}</p>
+                            )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Date of Birth</label>
+                                {isEditing ? (
+                                    <input
+                                        type="date"
+                                        value={editForm.dob ? new Date(editForm.dob).toISOString().split('T')[0] : ''}
+                                        onChange={(e) => handleInputChange('dob', e.target.value)}
+                                        className="w-full p-3 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-ring transition-colors"
+                                    />
+                                ) : (
+                                    <p className="p-3 bg-muted/30 rounded-lg flex items-center">
+                                        <Calendar className="mr-2 text-muted-foreground" size={16} />
+                                        {profile.dob ? new Date(profile.dob).toLocaleDateString() : 'Not provided'}
+                                    </p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Gender</label>
+                                {isEditing ? (
+                                    <select
+                                        value={editForm.gender || ''}
+                                        onChange={(e) => handleInputChange('gender', e.target.value)}
+                                        className="w-full p-3 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-ring transition-colors"
+                                    >
+                                        <option value="">Select Gender</option>
+                                        <option value="male">Male</option>
+                                        <option value="female">Female</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                ) : (
+                                    <p className="p-3 bg-muted/30 rounded-lg capitalize">{profile.gender || 'Not provided'}</p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium mb-2">Phone</label>
+                            {isEditing ? (
+                                <input
+                                    type="tel"
+                                    value={editForm.phone || ''}
+                                    onChange={(e) => handleInputChange('phone', e.target.value)}
+                                    className="w-full p-3 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-ring transition-colors"
+                                />
+                            ) : (
+                                <p className="p-3 bg-muted/30 rounded-lg flex items-center">
+                                    <Phone className="mr-2 text-muted-foreground" size={16} />
+                                    {profile.phone || 'Not provided'}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Medical Information */}
+                <div className="border border-border rounded-lg p-6">
+                    <h2 className="text-xl font-semibold mb-6 flex items-center border-b border-border pb-3">
+                        <Heart className="mr-2" size={24} />
+                        Medical Information
+                    </h2>
+
+                    <div className="space-y-5">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Blood Group</label>
+                                {isEditing ? (
+                                    <select
+                                        value={editForm.bloodGroup || ''}
+                                        onChange={(e) => handleInputChange('bloodGroup', e.target.value)}
+                                        className="w-full p-3 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-ring transition-colors"
+                                    >
+                                        <option value="">Select Blood Group</option>
+                                        <option value="A+">A+</option>
+                                        <option value="A-">A-</option>
+                                        <option value="B+">B+</option>
+                                        <option value="B-">B-</option>
+                                        <option value="AB+">AB+</option>
+                                        <option value="AB-">AB-</option>
+                                        <option value="O+">O+</option>
+                                        <option value="O-">O-</option>
+                                    </select>
+                                ) : (
+                                    <p className="p-3 bg-muted/30 rounded-lg">{profile.bloodGroup || 'Not provided'}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Height (cm)</label>
+                                {isEditing ? (
+                                    <input
+                                        type="number"
+                                        value={editForm.height || ''}
+                                        onChange={(e) => handleInputChange('height', e.target.value)}
+                                        className="w-full p-3 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-ring transition-colors"
+                                    />
+                                ) : (
+                                    <p className="p-3 bg-muted/30 rounded-lg">{profile.height ? `${profile.height} cm` : 'Not provided'}</p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium mb-2">Weight (kg)</label>
+                            {isEditing ? (
+                                <input
+                                    type="number"
+                                    value={editForm.weight || ''}
+                                    onChange={(e) => handleInputChange('weight', e.target.value)}
+                                    className="w-full p-3 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-ring transition-colors"
+                                />
+                            ) : (
+                                <p className="p-3 bg-muted/30 rounded-lg">{profile.weight ? `${profile.weight} kg` : 'Not provided'}</p>
+                            )}
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium mb-2">Allergies</label>
+                            {isEditing ? (
+                                <textarea
+                                    value={editForm.allergies?.join(', ') || ''}
+                                    onChange={(e) => handleInputChange('allergies', e.target.value.split(', ').filter(Boolean))}
+                                    placeholder="Enter allergies separated by commas"
+                                    className="w-full p-3 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-ring transition-colors"
+                                    rows={3}
+                                />
+                            ) : (
+                                <p className="p-3 bg-muted/30 rounded-lg flex items-start">
+                                    <AlertCircle className="mr-2 text-muted-foreground mt-0.5 flex-shrink-0" size={16} />
+                                    {profile.allergies && profile.allergies.length > 0 ? profile.allergies.join(', ') : 'None listed'}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Address Information */}
+                <div className="border border-border rounded-lg p-6">
+                    <h2 className="text-xl font-semibold mb-6 flex items-center border-b border-border pb-3">
+                        <MapPin className="mr-2" size={24} />
+                        Address Information
+                    </h2>
+
+                    <div className="space-y-5">
+                        <div>
+                            <label className="block text-sm font-medium mb-2">Street Address</label>
+                            {isEditing ? (
+                                <input
+                                    type="text"
+                                    value={editForm.address?.street || ''}
+                                    onChange={(e) => handleInputChange('address.street', e.target.value)}
+                                    className="w-full p-3 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-ring transition-colors"
+                                />
+                            ) : (
+                                <p className="p-3 bg-muted/30 rounded-lg">{profile.address?.street || 'Not provided'}</p>
+                            )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-2">City</label>
+                                {isEditing ? (
+                                    <input
+                                        type="text"
+                                        value={editForm.address?.city || ''}
+                                        onChange={(e) => handleInputChange('address.city', e.target.value)}
+                                        className="w-full p-3 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-ring transition-colors"
+                                    />
+                                ) : (
+                                    <p className="p-3 bg-muted/30 rounded-lg">{profile.address?.city || 'Not provided'}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium mb-2">State</label>
+                                {isEditing ? (
+                                    <input
+                                        type="text"
+                                        value={editForm.address?.state || ''}
+                                        onChange={(e) => handleInputChange('address.state', e.target.value)}
+                                        className="w-full p-3 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-ring transition-colors"
+                                    />
+                                ) : (
+                                    <p className="p-3 bg-muted/30 rounded-lg">{profile.address?.state || 'Not provided'}</p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Pincode</label>
+                                {isEditing ? (
+                                    <input
+                                        type="text"
+                                        value={editForm.address?.pincode || ''}
+                                        onChange={(e) => handleInputChange('address.pincode', e.target.value)}
+                                        className="w-full p-3 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-ring transition-colors"
+                                    />
+                                ) : (
+                                    <p className="p-3 bg-muted/30 rounded-lg">{profile.address?.pincode || 'Not provided'}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Country</label>
+                                {isEditing ? (
+                                    <input
+                                        type="text"
+                                        value={editForm.address?.country || ''}
+                                        onChange={(e) => handleInputChange('address.country', e.target.value)}
+                                        className="w-full p-3 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-ring transition-colors"
+                                    />
+                                ) : (
+                                    <p className="p-3 bg-muted/30 rounded-lg">{profile.address?.country || 'Not provided'}</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Emergency Contact */}
+                <div className="border border-border rounded-lg p-6">
+                    <h2 className="text-xl font-semibold mb-6 flex items-center border-b border-border pb-3">
+                        <AlertCircle className="mr-2" size={24} />
+                        Emergency Contact
+                    </h2>
+
+                    <div className="space-y-5">
+                        <div>
+                            <label className="block text-sm font-medium mb-2">Contact Name</label>
+                            {isEditing ? (
+                                <input
+                                    type="text"
+                                    value={editForm.emergencyContact?.name || ''}
+                                    onChange={(e) => handleInputChange('emergencyContact.name', e.target.value)}
+                                    className="w-full p-3 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-ring transition-colors"
+                                />
+                            ) : (
+                                <p className="p-3 bg-muted/30 rounded-lg">{profile.emergencyContact?.name || 'Not provided'}</p>
+                            )}
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium mb-2">Phone Number</label>
+                            {isEditing ? (
+                                <input
+                                    type="tel"
+                                    value={editForm.emergencyContact?.phone || ''}
+                                    onChange={(e) => handleInputChange('emergencyContact.phone', e.target.value)}
+                                    className="w-full p-3 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-ring transition-colors"
+                                />
+                            ) : (
+                                <p className="p-3 bg-muted/30 rounded-lg">{profile.emergencyContact?.phone || 'Not provided'}</p>
+                            )}
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium mb-2">Relationship</label>
+                            {isEditing ? (
+                                <input
+                                    type="text"
+                                    value={editForm.emergencyContact?.relationship || ''}
+                                    onChange={(e) => handleInputChange('emergencyContact.relationship', e.target.value)}
+                                    className="w-full p-3 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-ring transition-colors"
+                                />
+                            ) : (
+                                <p className="p-3 bg-muted/30 rounded-lg">{profile.emergencyContact?.relationship || 'Not provided'}</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Save Button */}
+            {isEditing && (
+                <div className="flex justify-end">
+                    <button
+                        onClick={handleUpdateProfile}
+                        className="flex items-center space-x-2 bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3 rounded-lg transition-colors font-medium"
+                    >
+                        <Save size={20} />
+                        <span>Save Changes</span>
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

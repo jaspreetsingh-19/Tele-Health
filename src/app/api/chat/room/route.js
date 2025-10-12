@@ -8,6 +8,7 @@ export async function POST(request) {
     try {
         console.log("starting")
         await connect()
+
         const userId = await getDataFromToken(request)
         const body = await request.json()
         const { appointmentId } = body
@@ -27,61 +28,59 @@ export async function POST(request) {
         }
 
         // Verify user has access to this appointment
-        const hasAccess = appointment.patientId._id.toString() === userId ||
+        const hasAccess =
+            appointment.patientId._id.toString() === userId ||
             appointment.doctorId._id.toString() === userId
 
         if (!hasAccess) {
             return NextResponse.json({ success: false, message: "Unauthorized access" }, { status: 403 })
         }
 
-        // Check if chat room already exists
-        let chatRoom = await ChatRoom.findOne({ appointmentId })
-            .populate([
-                { path: "patientId", select: "username email patientProfile avatar" },
-                { path: "doctorId", select: "username email doctorProfile avatar" }
-            ])
+        // ✅ CHANGE STARTS HERE — use atomic "findOneAndUpdate" instead of manual check + save
+        const roomId = appointment.roomId || `room_${appointmentId}`
 
-        if (!chatRoom) {
-            // Create new chat room
-            const roomId = appointment.roomId || `room_${appointmentId}_${Date.now()}`
+        // This will either return the existing room or create one atomically
+        const chatRoom = await ChatRoom.findOneAndUpdate(
+            { appointmentId }, // find by appointment
+            {
+                $setOnInsert: {
+                    roomId,
+                    appointmentId,
+                    patientId: appointment.patientId._id,
+                    doctorId: appointment.doctorId._id,
+                    messages: [],
+                    isActive: true,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                },
+            },
+            { upsert: true, new: true } // create if not found, return the updated doc
+        ).populate([
+            { path: "patientId", select: "username email patientProfile avatar" },
+            { path: "doctorId", select: "username email doctorProfile avatar" },
+        ])
+        // ✅ CHANGE ENDS HERE
 
-            chatRoom = new ChatRoom({
-                roomId,
-                appointmentId,
-                patientId: appointment.patientId._id,
-                doctorId: appointment.doctorId._id,
-                messages: [],
-                isActive: true,
-                createdAt: new Date(),
-                updatedAt: new Date()
-            })
-
-            await chatRoom.save()
-
-            // Update appointment with roomId if not exists
-            if (!appointment.roomId) {
-                appointment.roomId = roomId
-                await appointment.save()
-            }
-
-            // Populate after save
-            await chatRoom.populate([
-                { path: "patientId", select: "username email patientProfile avatar" },
-                { path: "doctorId", select: "username email doctorProfile avatar" }
-            ])
+        // Update appointment with roomId if not already set
+        if (!appointment.roomId) {
+            appointment.roomId = roomId
+            await appointment.save()
         }
 
         return NextResponse.json({
             success: true,
             chatRoom,
-            message: "Chat room ready"
+            message: "Chat room ready",
         })
     } catch (error) {
         console.error("Error creating chat room:", error)
-        return NextResponse.json({
-            success: false,
-            message: "Failed to create chat room",
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
-        }, { status: 500 })
+        return NextResponse.json(
+            {
+                success: false,
+                message: "Failed to create chat room",
+                error: process.env.NODE_ENV === "development" ? error.message : undefined,
+            },
+            { status: 500 }
+        )
     }
 }

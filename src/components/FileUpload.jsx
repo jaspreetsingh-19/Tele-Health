@@ -47,7 +47,7 @@ export default function FileUpload({ onFileUploaded, roomId, disabled }) {
 
         setUploading(true)
         setUploadProgress(0)
-        toast.loading(`Uploading ${file.name}...`)
+
 
         try {
             const formData = new FormData()

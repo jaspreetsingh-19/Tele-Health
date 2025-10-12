@@ -13,7 +13,7 @@ export default function ChatButton({ roomId, disabled = false }) {
     const joinChat = async () => {
         try {
             setLoading(true)
-            toast.loading("Joining chat...")
+
 
             // Navigate to consultation room (chat mode)
             router.push(`/consultation/${roomId}?mode=chat`)

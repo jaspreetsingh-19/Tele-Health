@@ -81,7 +81,7 @@ export default function PatientVideoCall() {
         try {
             setLoading(true)
             setError(null)
-            toast.loading("Initiating video call...")
+
 
             const response = await axios.post("/api/video/initiate", {
                 appointmentId,
@@ -119,7 +119,7 @@ export default function PatientVideoCall() {
         } finally {
             setCallActive(false)
             setCallData(null)
-            router.push("/patient/appointments")
+            router.push("/patient/appointment")
         }
     }
 
@@ -139,7 +139,7 @@ export default function PatientVideoCall() {
             <div className="flex items-center justify-center min-h-screen p-4">
                 <div className="text-center max-w-md mx-auto">
                     <p className="text-sm sm:text-base text-muted-foreground mb-4">Authentication required</p>
-                    <Button onClick={() => router.push("/login")} className="w-full sm:w-auto">
+                    <Button onClick={() => router.push("/auth/login")} className="w-full sm:w-auto">
                         Go to Login
                     </Button>
                 </div>

@@ -11,21 +11,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import axios from "axios"
-import ConsultationControls from "@/components/ConsultationControls"
 import { useRouter } from "next/navigation"
 
-
 export default function DoctorAppointmentsPage() {
-    return (
-
-        <DoctorAppointmentsContent />
-
-    )
+    return <DoctorAppointmentsContent />
 }
 
 function DoctorAppointmentsContent() {
     const [appointments, setAppointments] = useState([])
-
     const [loading, setLoading] = useState(false)
     const [filter, setFilter] = useState({
         status: "all",
@@ -45,7 +38,6 @@ function DoctorAppointmentsContent() {
             const response = await axios.get(`/api/appointments?${params}`)
             if (response.data.success) {
                 let filteredAppointments = response.data.appointments
-
 
                 if (filter.consultationType !== "all") {
                     filteredAppointments = filteredAppointments.filter((apt) => apt.consultationType === filter.consultationType)
@@ -99,7 +91,6 @@ function DoctorAppointmentsContent() {
                 return "bg-muted text-muted-foreground"
         }
     }
-
 
     const getTodayAppointments = () => {
         const today = new Date().toISOString().split("T")[0]
@@ -300,7 +291,7 @@ function AppointmentCard({ appointment, onStatusUpdate }) {
             setTimeout(() => setCopiedRoomId(false), 2000)
             toast.success("Room ID copied to clipboard")
         } catch (err) {
-            console.error('Failed to copy room ID:', err)
+            console.error("Failed to copy room ID:", err)
             toast.error("Failed to copy room ID")
         }
     }
@@ -321,8 +312,24 @@ function AppointmentCard({ appointment, onStatusUpdate }) {
         router.push(`/doctor/videoCallPatient?appointmentId=${appointmentId}`)
     }
 
-    return (
+    const [now, setNow] = useState(new Date())
+    useEffect(() => {
+        const id = setInterval(() => setNow(new Date()), 30000) // tick every 30s
+        return () => clearInterval(id)
+    }, [])
+    const getAppointmentStartDate = () => {
+        const base = new Date(appointment.appointmentDate)
+        const startStr = appointment?.timeSlot?.startTime
+        if (startStr) {
+            const [h, m] = startStr.split(":").map(Number)
+            base.setHours(isNaN(h) ? 0 : h, isNaN(m) ? 0 : m, 0, 0)
+        }
+        return base
+    }
+    const accessibleAt = new Date(getAppointmentStartDate().getTime() - 15 * 60 * 1000)
+    const isAccessible = now >= accessibleAt
 
+    return (
         <Card className="hover:shadow-md transition-shadow">
             <CardContent className="p-4 sm:p-6">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -347,7 +354,9 @@ function AppointmentCard({ appointment, onStatusUpdate }) {
                             </div>
                             <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
                                 <Clock className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                                <span>{formatTime(appointment.timeSlot.startTime)} - {formatTime(appointment.timeSlot.endTime)}</span>
+                                <span>
+                                    {formatTime(appointment.timeSlot.startTime)} - {formatTime(appointment.timeSlot.endTime)}
+                                </span>
                             </div>
                             <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
                                 {appointment.consultationType === "video" ? (
@@ -396,6 +405,9 @@ function AppointmentCard({ appointment, onStatusUpdate }) {
                                 size="sm"
                                 variant="outline"
                                 className="hover:bg-primary hover:text-primary-foreground bg-transparent text-xs sm:text-sm w-full"
+                                disabled={!isAccessible}
+                                aria-disabled={!isAccessible}
+                                title={!isAccessible ? "Available 15 minutes before start time" : undefined}
                                 onClick={() => handleJoinVideoCall(appointment.appointmentId)}
                             >
                                 <Video className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
@@ -408,6 +420,9 @@ function AppointmentCard({ appointment, onStatusUpdate }) {
                                 size="sm"
                                 variant="outline"
                                 className="hover:bg-primary hover:text-primary-foreground bg-transparent text-xs sm:text-sm w-full"
+                                disabled={!isAccessible}
+                                aria-disabled={!isAccessible}
+                                title={!isAccessible ? "Available 15 minutes before start time" : undefined}
                                 onClick={() => handleStartChat(appointment._id)}
                             >
                                 <MessageCircle className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
@@ -415,33 +430,10 @@ function AppointmentCard({ appointment, onStatusUpdate }) {
                             </Button>
                         )}
 
-                        {appointment.consultationType === "video" && appointment.roomId && (
-                            <div className="bg-muted/50 rounded-lg p-2 sm:p-3 border w-full">
-                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                                    <div className="min-w-0 flex-1">
-                                        <span className="text-xs sm:text-sm font-medium">Meeting Room ID:</span>
-                                        <div className="text-xs text-muted-foreground font-mono mt-1 break-all">
-                                            {appointment.roomId}
-                                        </div>
-                                    </div>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={copyRoomId}
-                                        className="w-full sm:w-auto sm:ml-2 text-xs"
-                                    >
-                                        {copiedRoomId ? (
-                                            <Check className="h-3 w-3 sm:h-4 sm:w-4" />
-                                        ) : (
-                                            <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
-                                        )}
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
+
                     </div>
                 </div>
             </CardContent>
-        </Card >
+        </Card>
     )
 }

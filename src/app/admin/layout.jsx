@@ -147,7 +147,7 @@ export default function DashboardLayout({ children }) {
                         <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-green-600 rounded-xl flex items-center justify-center">
                             <Heart className="h-6 w-6 text-white" />
                         </div>
-                        <h1 className="text-lg font-semibold">HealthCare Connect</h1>
+                        <h1 className="text-lg font-semibold">TELE-HEALTH</h1>
                     </div>
                 </div>
 

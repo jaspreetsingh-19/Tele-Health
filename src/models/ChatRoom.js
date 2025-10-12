@@ -74,7 +74,7 @@ chatRoomSchema.pre('save', function (next) {
 })
 
 // Index for efficient queries
-chatRoomSchema.index({ roomId: 1 })
+
 chatRoomSchema.index({ appointmentId: 1 })
 chatRoomSchema.index({ patientId: 1 })
 chatRoomSchema.index({ doctorId: 1 })

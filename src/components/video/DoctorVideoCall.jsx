@@ -55,7 +55,7 @@ export default function DoctorVideoCall() {
 
     useEffect(() => {
         if (appointmentDetails) {
-            // console.log("appointmentDetails updated:", appointmentDetails)
+            console.log("appointmentDetails updated:", appointmentDetails)
         }
     }, [appointmentDetails])
 
@@ -82,7 +82,6 @@ export default function DoctorVideoCall() {
         try {
             setLoading(true)
             setError(null)
-            toast.loading("Initiating video call...")
 
             const response = await axios.post("/api/video/initiate", {
                 appointmentId,
@@ -105,7 +104,7 @@ export default function DoctorVideoCall() {
 
     const handleCallEnd = async () => {
         try {
-            toast.loading("Ending video call...")
+
 
             if (callData?.callId) {
                 await axios.post("/api/video/end", {
@@ -140,7 +139,7 @@ export default function DoctorVideoCall() {
             <div className="flex items-center justify-center min-h-screen p-4">
                 <div className="text-center max-w-sm mx-auto">
                     <p className="text-muted-foreground text-sm md:text-base mb-4">Authentication required</p>
-                    <Button onClick={() => router.push("/login")} className="w-full md:w-auto">
+                    <Button onClick={() => router.push("/auth/login")} className="w-full md:w-auto">
                         Go to Login
                     </Button>
                 </div>

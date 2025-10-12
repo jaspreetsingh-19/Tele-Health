@@ -71,12 +71,7 @@ const getNavigationItems = () => [
         icon: CreditCard,
         description: "View earnings and payments",
     },
-    {
-        title: "Settings",
-        url: "/doctor/settings",
-        icon: Settings,
-        description: "Account and notification preferences",
-    },
+
 ]
 
 const getInitials = (username) => {
@@ -105,7 +100,7 @@ export default function DashboardLayout({ children }) {
                 setUser(res.data)
             } catch (error) {
                 console.error("Failed to fetch user", error)
-                router.push("/login")
+                router.push("/auth/login")
             } finally {
                 setIsLoading(false)
             }
@@ -122,7 +117,7 @@ export default function DashboardLayout({ children }) {
                         <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                             <Heart className="size-4" />
                         </div>
-                        <h1 className="text-lg font-semibold">HealthCare Connect</h1>
+                        <h1 className="text-lg font-semibold">TELE-HEALTH</h1>
                     </div>
                     <div className="flex items-center gap-2 text-muted-foreground">
                         <Loader2 className="h-5 w-5 animate-spin" />
@@ -169,7 +164,7 @@ export default function DashboardLayout({ children }) {
                         <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-green-600 rounded-xl flex items-center justify-center">
                             <Heart className="h-6 w-6 text-white" />
                         </div>
-                        <h1 className="text-lg font-semibold">HealthCare Connect</h1>
+                        <h1 className="text-lg font-semibold">TELE-HEALTH</h1>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
