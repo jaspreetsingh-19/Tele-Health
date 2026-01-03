@@ -114,8 +114,8 @@ export default function PatientVideoCall() {
             }
             toast.success("Call ended successfully")
         } catch (err) {
-            console.error("Error ending call:", err)
-            toast.error("Error ending call, but redirecting anyway")
+            
+            toast.error("Redirecting")
         } finally {
             setCallActive(false)
             setCallData(null)

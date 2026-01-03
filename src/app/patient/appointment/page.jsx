@@ -465,29 +465,8 @@ function PatientAppointmentCard({ appointment, onCancel, onNavigateToChat, onNav
                             <span className="text-muted-foreground">₹{appointment.consultationFee}</span>
                         </div>
 
-                        {/* Room ID Block for Video Consultations */}
-                        {appointment.consultationType === "video" && appointment.roomId && (
-                            <div className="bg-muted/50 rounded-lg p-2 sm:p-3 border w-full">
-                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                                    <div className="min-w-0 flex-1">
-                                        <span className="text-xs sm:text-sm font-medium">Meeting Room ID:</span>
-                                        <div className="text-xs text-muted-foreground font-mono mt-1 break-all">{appointment.roomId}</div>
-                                    </div>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={copyRoomId}
-                                        className="w-full sm:w-auto sm:ml-2 text-xs bg-transparent"
-                                    >
-                                        {copiedRoomId ? (
-                                            <Check className="h-3 w-3 sm:h-4 sm:w-4" />
-                                        ) : (
-                                            <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
-                                        )}
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
+                       
+                        
                     </div>
 
                     <div className="flex flex-col gap-2 w-full lg:w-auto lg:min-w-[180px]">
