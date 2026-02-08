@@ -1,12 +1,13 @@
 
-import connect from "@/lib/db";
+import connectDB from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
 import User from "@/models/user"
 import { getDataFromToken } from "@/helper/getDataFromToken";
 
-connect();
 
 export async function GET(request) {
+    await connectDB();
+
     try {
         const userId = await getDataFromToken(request);
         const userData = await User.findOne({ _id: userId }).select("-password");

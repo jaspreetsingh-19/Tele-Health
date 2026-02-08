@@ -1,11 +1,11 @@
 import VideoCall from "@/models/VideoCall";
-import connect from "@/lib/db";
+import connectDB from "@/lib/db";
 import { getDataFromToken } from "@/helper/getDataFromToken";
 import { NextResponse } from "next/server";
 
 export async function POST(request) {
     try {
-        await connect();
+        await connectDB();
         const userId = getDataFromToken(request);
 
         const { callId } = await request.json();

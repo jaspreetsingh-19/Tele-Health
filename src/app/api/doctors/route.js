@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server"
-import connect from "@/lib/db"
+import connectDB from "@/lib/db"
 import User from "@/models/user"
 
 // GET - Get all approved doctors
 export async function GET(request) {
     try {
-        await connect()
+        await connectDB()
         const { searchParams } = new URL(request.url)
         const specialization = searchParams.get("specialization")
         const search = searchParams.get("search")

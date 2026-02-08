@@ -1,7 +1,7 @@
 // app/api/appointments/[appointmentId]/receipt/route.js
 import { NextResponse } from 'next/server'
 import { getDataFromToken } from '@/helper/getDataFromToken'
-import connect from '@/lib/db'
+import connectDB from '@/lib/db'
 import Appointment from '@/models/Appointment'
 import User from '@/models/user'
 
@@ -18,7 +18,7 @@ export async function GET(request, { params }) {
             )
         }
 
-        await connect()
+        await connectDB()
 
         // Get appointment details
         const appointment = await Appointment.findById(id)

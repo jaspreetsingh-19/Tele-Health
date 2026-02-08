@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import Log from "@/models/logs";
 import User from "@/models/user";
-import connect from "@/lib/db";
+import connectDB from "@/lib/db";
 
-connect();
+
 
 export async function GET(request) {
+    await connectDB();
+
 
     try {
 
@@ -19,6 +21,8 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
+    await connectDB();
+
     try {
         const { userId, action, feature, details } = await request.json();
 

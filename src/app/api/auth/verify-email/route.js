@@ -1,16 +1,12 @@
-import connect from "@/lib/db"
+import connectDB from "@/lib/db"
 import { NextRequest, NextResponse } from "next/server";
 import User from "@/models/user"
 import { sendWelcomeEmail } from "@/helper/mailtrap.config";
 
 
-
-
-
-
-connect()
-
 export async function POST(request) {
+    await connectDB();
+
     console.log("started")
     try {
         const reqBody = await request.json()

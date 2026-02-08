@@ -2,12 +2,12 @@
 import { NextResponse } from "next/server"
 import ChatRoom from "@/models/ChatRoom"
 import Appointment from "@/models/Appointment"
-import connect from "@/lib/db"
+import connectDB from "@/lib/db"
 import { getDataFromToken } from "@/helper/getDataFromToken"
 
 export async function POST(req) {
     try {
-        await connect()
+        await connectDB()
         const userId = await getDataFromToken(req)
 
         if (!userId) {
@@ -87,7 +87,7 @@ export async function POST(req) {
 
 export async function GET(req) {
     try {
-        await connect()
+        await connectDB()
         const userId = await getDataFromToken(req)
 
         if (!userId) {

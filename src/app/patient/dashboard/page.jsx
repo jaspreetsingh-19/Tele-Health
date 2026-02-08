@@ -17,6 +17,7 @@ const PatientProfile = () => {
         authProvider: '',
         profile: {
             patientId: '',
+            patientPhoto: '',
             fullName: '',
             dob: '',
             gender: '',
@@ -46,6 +47,8 @@ const PatientProfile = () => {
     const [formData, setFormData] = useState({});
     const [newAllergy, setNewAllergy] = useState('');
     const [newMedication, setNewMedication] = useState('');
+    const fileRef = React.useRef(null);
+
 
     // Fetch profile data on component mount
     useEffect(() => {
@@ -69,9 +72,9 @@ const PatientProfile = () => {
                 const userData = data.user;
                 // API returns 'profile' but we use 'doctorProfile' in the component
                 const patientProfile = userData.profile || userData.patientProfile || {
-                    doctorId: '',
+                    PatientId: '',
                     fullName: '',
-                    docPhoto: '',
+                    patientPhoto: '',
                     specialization: [],
                     qualifications: '',
                     experienceYears: 0,
@@ -142,6 +145,48 @@ const PatientProfile = () => {
         });
     };
 
+    const handlePhotoUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formDataUpload = new FormData();
+        formDataUpload.append("file", file);
+
+        try {
+            const res = await fetch("/api/upload", {
+                method: "POST",
+                body: formDataUpload,
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                // Update the formData state so the UI shows the new image immediately
+                setFormData(prev => ({
+                    ...prev,
+                    profile: {
+                        ...prev.profile,
+                        patientPhoto: data.file.url
+                    }
+                }));
+
+                // Optionally update profileData as well to keep in sync
+                setProfileData(prev => ({
+                    ...prev,
+                    profile: {
+                        ...prev.profile,
+                        patientPhoto: data.file.url
+                    }
+                }));
+            } else {
+                console.error("Upload failed:", data.error);
+            }
+        } catch (err) {
+            console.error("Error uploading photo:", err);
+        }
+    };
+
+
+
     const addAllergy = () => {
         if (newAllergy.trim()) {
             setFormData(prev => ({
@@ -208,10 +253,17 @@ const PatientProfile = () => {
             const data = await response.json();
 
             if (data.success) {
-                setProfileData(data.user);
+                setProfileData(prev => ({
+                    ...prev,
+                    profile: data.user.profile // ✅ update nested profile
+                }));
+                setFormData(prev => ({
+                    ...prev,
+                    profile: data.user.profile
+                }));
                 setIsEditing(false);
-
-            } else {
+            }
+            else {
                 throw new Error(data.error || 'Failed to update profile');
             }
         } catch (error) {
@@ -248,9 +300,9 @@ const PatientProfile = () => {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
                             <div className="relative">
-                                {profileData.avatar ? (
+                                {profileData.profile?.patientPhoto ? (
                                     <img
-                                        src={profileData.avatar}
+                                        src={profileData.profile.patientPhoto}
                                         alt="Profile"
                                         className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
                                     />
@@ -259,11 +311,23 @@ const PatientProfile = () => {
                                         <User className="w-8 h-8 text-gray-400" />
                                     </div>
                                 )}
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    hidden
+                                    ref={fileRef}
+                                    onChange={handlePhotoUpload}
+                                />
+
                                 {isEditing && (
-                                    <button className="absolute -bottom-2 -right-2 bg-blue-600 text-white rounded-full p-2 hover:bg-blue-700 transition-colors">
+                                    <button
+                                        onClick={() => fileRef.current.click()}
+                                        className="absolute -bottom-2 -right-2 bg-blue-600 text-white rounded-full p-2"
+                                    >
                                         <Camera className="w-4 h-4" />
                                     </button>
                                 )}
+
                             </div>
                             <div>
                                 <h1 className="text-2xl font-bold text-gray-900">

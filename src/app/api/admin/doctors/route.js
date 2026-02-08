@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server"
 import User from "@/models/user"
-import connect from "@/lib/db";
+import connectDB from "@/lib/db";
 import bcrypt from "bcryptjs";
 
 
-connect();
+
 
 function generateDoctorId() {
     const randomNum = Math.floor(100000 + Math.random() * 900000); // 6-digit number
@@ -12,6 +12,7 @@ function generateDoctorId() {
 }
 
 export async function GET(request) {
+await connectDB();
 
 
     try {
@@ -28,6 +29,8 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
+    await connectDB();
+
     try {
         const body = await request.json();
         const {
@@ -104,6 +107,8 @@ export async function POST(request) {
 }
 
 export async function DELETE(request) {
+    await connectDB();
+
 
     try {
         const { userId } = await request.json();

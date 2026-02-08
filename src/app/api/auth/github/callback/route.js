@@ -1,10 +1,12 @@
 import axios from "axios";
 import jwt from "jsonwebtoken";
 import { NextResponse } from "next/server";
-import connect from "@/lib/db";
+import connectDB from "@/lib/db";
 import User from "@/models/user";
 
 export async function GET(req) {
+    await connectDB();
+
     const url = new URL(req.url);
     const code = url.searchParams.get("code");
     if (!code) return NextResponse.redirect(`${process.env.NEXT_PUBLIC_CLIENT_URL}/login?error=OAuthFailed`);
@@ -39,7 +41,7 @@ export async function GET(req) {
     const email = emailRes.data.find(e => e.primary)?.email;
     const { name, login } = userRes.data;
 
-    await connect();
+    await connectDBs();
     let user = await User.findOne({ email });
 
     if (!user) {

@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import User from "@/models/user"
 import crypto from "crypto";
-import connect from "@/lib/db";
+import connectDB from "@/lib/db";
 import { sendPasswordResetEmail } from "@/helper/mailtrap.config";
 
-connect();
+
 
 export async function POST(request) {
+    await connectDB();
+
     const reqBody = await request.json();
     const { email } = reqBody;
 

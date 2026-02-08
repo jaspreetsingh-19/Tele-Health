@@ -1,18 +1,13 @@
 import { NextResponse } from "next/server";
-import connect from "@/lib/db";
-import User from "@/models/user";
+import connectDB from "@/lib/db";
+
 import { getDataFromToken } from "@/helper/getDataFromToken";
 
-
-
-connect();
-
-
-import connect from "@/lib/db";
-import { NextResponse } from "next/server";
 import User from "@/models/user";
 
+
 export async function GET(req) {
+await connectDB();
 
 
     const { searchParams } = new URL(req.url);

@@ -1,4 +1,4 @@
-import connect from "@/lib/db"
+import connectDB from "@/lib/db"
 import { NextRequest, NextResponse } from "next/server";
 import User from "@/models/user"
 import bcrypt from "bcryptjs";
@@ -8,11 +8,11 @@ import sendVerificationEmail from "@/helper/mailtrap.config"
 
 
 
-console.log("signup route called")
 
-connect()
 
 export async function POST(request) {
+    await connectDB();
+
 
     try {
         const reqBody = await request.json()

@@ -1,4 +1,4 @@
-import connect from "@/lib/db";
+import connectDB from "@/lib/db";
 import { NextResponse } from "next/server";
 import Symptom from "@/models/Symptom";
 import Log from "@/models/logs";
@@ -6,10 +6,12 @@ import { GoogleGenerativeAI } from "@google/generative-ai"
 import { getDataFromToken } from "@/helper/getDataFromToken"
 
 
-connect();
+
 
 
 export async function POST(request) {
+    await connectDB();
+
     try {
         const userId = await getDataFromToken(request)
         if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -71,6 +73,8 @@ Symptoms: ${inputText}
 }
 
 export async function GET(request) {
+    await connectDB();
+
     try {
         const userId = await getDataFromToken(request)
         if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

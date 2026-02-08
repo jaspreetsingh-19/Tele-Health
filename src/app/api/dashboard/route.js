@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
-import connect from "@/lib/db";
+import connectDB from "@/lib/db";
 import User from "@/models/user";
 import { getDataFromToken } from "@/helper/getDataFromToken";
 
-connect();
+
 
 export async function GET(request) {
+    await connectDB();
+
     const userId = await getDataFromToken(request);
     if (!userId) {
         return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -47,6 +49,8 @@ export async function GET(request) {
 }
 
 export async function PUT(request) {
+    await connectDB();
+
 
     const userId = await getDataFromToken(request);
     if (!userId) {

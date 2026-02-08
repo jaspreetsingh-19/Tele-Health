@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import connect from "@/lib/db";
+import connectDB from "@/lib/db";
 import Appointment from "@/models/Appointment";
 import { getDataFromToken } from "@/helper/getDataFromToken";
 
@@ -10,7 +10,7 @@ export async function GET(req) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        await connect();
+        await connectDB();
 
         // ✅ Only count completed + paid appointments
         const appointments = await Appointment.find({

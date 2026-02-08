@@ -1,7 +1,7 @@
 import axios from "axios"
 import jwt from "jsonwebtoken"
 import { NextResponse } from "next/server"
-import connect from "@/lib/db"
+import connectDB from "@/lib/db"
 import User from "@/models/user"
 
 export async function GET(req) {
@@ -29,7 +29,7 @@ export async function GET(req) {
 
     const { email, name } = userInfo.data
 
-    await connect()
+    await connectDB()
     let user = await User.findOne({ email })
 
     if (!user) {

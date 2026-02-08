@@ -1,28 +1,30 @@
 "use client"
-import React, { useState } from 'react';
-import {
-  Calendar,
-  Video,
-  MessageCircle,
-  Brain,
-  FileText,
-  Shield,
-  Clock,
-  Users,
-  Star,
-  Phone,
-  Mail,
-  MapPin,
-  Menu,
-  X,
+import { useState } from "react";
+import { 
+  Video, 
+  MessageCircle, 
+  Calendar, 
+  Shield, 
+  Brain, 
+  FileText, 
+  Users, 
+  Lock, 
+  Zap, 
   ChevronRight,
-  Check
-} from 'lucide-react';
-import { useRouter } from 'next/navigation';
+  Stethoscope,
+  Clock,
+  CheckCircle,
+  ArrowRight,
+  Server,
+  Wifi,
+  Database,
+  Code
+} from "lucide-react";
+import { useRouter } from "next/navigation"
 
 
-const TelehealthLanding = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+const Index = () => {
+
   const router = useRouter()
 
   function handleLogin() {
@@ -33,699 +35,428 @@ const TelehealthLanding = () => {
     router.push("/auth/signup")
   }
 
-  return (
-    <div className="min-h-screen bg-white">
-      {/* Navigation */}
-      <nav className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-2">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">H+</span>
-              </div>
-              <span className="text-xl font-bold text-gray-900">HealthConnect</span>
-            </div>
 
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-8">
-              <a href="#features" className="text-gray-600 hover:text-blue-600 transition-colors">Features</a>
-              <a href="#services" className="text-gray-600 hover:text-blue-600 transition-colors">Services</a>
-              <a href="#about" className="text-gray-600 hover:text-blue-600 transition-colors">About</a>
-              <a href="#contact" className="text-gray-600 hover:text-blue-600 transition-colors">Contact</a>
-              <button className="text-blue-600 hover:text-blue-700 font-medium" onClick={handleLogin}>Login</button>
-              <button className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors" onClick={handleGetStarted}>
+  const features = [
+    {
+      icon: MessageCircle,
+      title: "Real-Time Chat",
+      description: "Instant messaging with healthcare providers using WebSocket technology for seamless communication.",
+    },
+    {
+      icon: Video,
+      title: "Video Consultations",
+      description: "Secure, HD video calls powered by WebRTC for face-to-face consultations from anywhere.",
+    },
+    {
+      icon: Brain,
+      title: "AI Symptom Checker",
+      description: "AI-powered symptom analysis tool that provides educational health guidance and suggestions.",
+    },
+    {
+      icon: FileText,
+      title: "Report Analyzer",
+      description: "AI assistant that helps summarize and explain medical reports in simple terms.",
+    },
+    {
+      icon: Calendar,
+      title: "Smart Scheduling",
+      description: "Intuitive appointment booking system with automated reminders and calendar sync.",
+    },
+    {
+      icon: Users,
+      title: "Role-Based Access",
+      description: "Secure patient and doctor portals with appropriate access controls and permissions.",
+    }
+  ];
+
+  const howItWorks = [
+    {
+      step: "01",
+      title: "Create Account",
+      description: "Sign up as a patient or healthcare provider with secure authentication.",
+      icon: Users
+    },
+    {
+      step: "02",
+      title: "Book Consultation",
+      description: "Browse available doctors and schedule an appointment at your convenience.",
+      icon: Calendar
+    },
+    {
+      step: "03",
+      title: "Connect & Consult",
+      description: "Join your video call or chat session for your remote healthcare consultation.",
+      icon: Video
+    }
+  ];
+
+  const techStack = [
+    { name: "WebRTC", description: "Real-time video communication", icon: Wifi },
+    { name: "WebSockets", description: "Instant messaging", icon: Zap },
+    { name: "AI/ML", description: "Intelligent analysis", icon: Brain },
+    { name: "Secure Auth", description: "Protected access", icon: Lock },
+    { name: "Cloud Infrastructure", description: "Scalable backend", icon: Server },
+    { name: "Modern Stack", description: "React & Node.js", icon: Code }
+  ];
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <style>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
+        }
+        .animate-float { animation: float 6s ease-in-out infinite; }
+        .animate-float-delayed { animation: float 6s ease-in-out infinite; animation-delay: 3s; }
+      `}</style>
+
+      {/* Navigation */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-blue-600 to-teal-500 flex items-center justify-center">
+                <Stethoscope className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-xl font-bold text-slate-800">Tele-Health</span>
+            </div>
+            <div className="hidden md:flex items-center gap-8">
+              <a href="#features" className="text-slate-500 hover:text-slate-800 transition-colors">Features</a>
+              <a href="#how-it-works" className="text-slate-500 hover:text-slate-800 transition-colors">How It Works</a>
+              
+              <a href="#tech" className="text-slate-500 hover:text-slate-800 transition-colors">Technology</a>
+            </div>
+            <div className="flex items-center gap-3">
+              <button href="/login" className="px-5 py-2.5 text-slate-800 font-medium hover:text-blue-600 transition-colors"
+              onClick={handleLogin}
+              >
+
+                Login
+              </button>
+              <button href="/get-started" className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-teal-500 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-blue-500/25 transition-all duration-300"
+              onClick={handleGetStarted}
+              >
                 Get Started
               </button>
             </div>
-
-            {/* Mobile menu button */}
-            <div className="md:hidden">
-              <button
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="text-gray-600 hover:text-gray-900"
-              >
-                {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-              </button>
-            </div>
           </div>
-
-          {/* Mobile Navigation */}
-          {isMenuOpen && (
-            <div className="md:hidden">
-              <div className="px-2 pt-2 pb-3 space-y-1 bg-white border-t border-gray-100">
-                <a href="#features" className="block px-3 py-2 text-gray-600 hover:text-blue-600">Features</a>
-                <a href="#services" className="block px-3 py-2 text-gray-600 hover:text-blue-600">Services</a>
-                <a href="#about" className="block px-3 py-2 text-gray-600 hover:text-blue-600">About</a>
-                <a href="#contact" className="block px-3 py-2 text-gray-600 hover:text-blue-600">Contact</a>
-                <button className="block w-full text-left px-3 py-2 text-blue-600 font-medium">Login</button>
-                <button className="block w-full text-left px-3 py-2 bg-blue-600 text-white rounded-lg mt-2">
-                  Get Started
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-blue-50 to-indigo-100 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <h1 className="text-5xl font-bold text-gray-900 leading-tight mb-6">
-                Healthcare at Your
-                <span className="text-blue-600"> Fingertips</span>
+      <section className="pt-32 pb-20 px-6 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-transparent to-teal-50/30" />
+        <div className="absolute top-40 right-0 w-96 h-96 bg-teal-100/50 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-80 h-80 bg-emerald-100/50 rounded-full blur-3xl" />
+        
+        <div className="max-w-7xl mx-auto relative">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <div className="space-y-8">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 rounded-full">
+                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                <span className="text-sm font-medium text-blue-700">Portfolio Demo Project</span>
+              </div>
+              
+              <h1 className="text-5xl lg:text-6xl font-bold text-slate-800 leading-tight">
+                Healthcare
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-teal-500"> Reimagined</span>
+                <br />for the Digital Age
               </h1>
-              <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-                Connect with certified doctors instantly through our comprehensive telehealth platform.
-                Book appointments, get AI-powered health insights, and manage your healthcare from anywhere.
+              
+              <p className="text-xl text-slate-500 leading-relaxed max-w-lg">
+                A modern telehealth platform enabling seamless patient-doctor consultations through secure video calls, real-time messaging, and AI-powered health tools.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <button className="bg-blue-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center">
-                  Book Appointment
-                  <ChevronRight className="ml-2 h-5 w-5" />
+              
+              <div className="flex flex-wrap gap-4">
+                <button className="group px-8 py-4 bg-gradient-to-r from-blue-600 to-teal-500 text-white rounded-xl font-semibold hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-300 flex items-center gap-2">
+                  Explore Features
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </button>
-                <button className="border-2 border-blue-600 text-blue-600 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-blue-50 transition-colors">
+                <button className="px-8 py-4 bg-slate-100 text-slate-800 rounded-xl font-semibold hover:bg-slate-200 transition-all duration-300 flex items-center gap-2">
+                  <Video className="w-5 h-5" />
                   Watch Demo
                 </button>
               </div>
+
+              <div className="flex items-center gap-8 pt-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-emerald-500" />
+                  <span className="text-slate-500">Secure & Private</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-emerald-500" />
+                  <span className="text-slate-500">AI-Powered</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-emerald-500" />
+                  <span className="text-slate-500">Real-Time</span>
+                </div>
+              </div>
             </div>
+
             <div className="relative">
-              <div className="bg-white rounded-2xl shadow-2xl p-8 transform rotate-3 hover:rotate-0 transition-transform duration-500">
-                <div className="flex items-center space-x-4 mb-6">
-                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                    <Video className="h-6 w-6 text-blue-600" />
+              <div className="relative z-10 bg-white rounded-3xl shadow-2xl shadow-blue-500/10 overflow-hidden border border-slate-200">
+                <div className="bg-gradient-to-r from-blue-600 to-teal-500 p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center">
+                      <Video className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-white/80 text-sm">Video Consultation</p>
+                      <p className="text-white font-semibold text-lg">Dr. Mohan</p>
+                    </div>
+                    <div className="ml-auto flex items-center gap-2 bg-white/20 px-3 py-1.5 rounded-full">
+                      <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+                      <span className="text-white text-sm">Live</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div className="flex gap-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                      <MessageCircle className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div className="flex-1 bg-slate-100 rounded-2xl rounded-tl-none p-4">
+                      <p className="text-slate-700 text-sm">How can I help you today?</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3 justify-end">
+                    <div className="bg-blue-600 rounded-2xl rounded-tr-none p-4 max-w-xs">
+                      <p className="text-white text-sm">I'd like to discuss my recent test results.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-400 text-sm">
+                    <Clock className="w-4 h-4" />
+                    <span>Consultation in progress...</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Floating Elements */}
+              <div className="absolute -top-4 -right-4 bg-white rounded-2xl p-4 shadow-xl border border-slate-200 animate-float">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                    <Shield className="w-5 h-5 text-emerald-600" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900">Video Consultation</h3>
-                    <p className="text-sm text-gray-500">with Dr. Sarah Johnson</p>
+                    <p className="text-xs text-slate-400">Connection</p>
+                    <p className="text-sm font-semibold text-slate-700">End-to-End Encrypted</p>
                   </div>
                 </div>
-                <div className="bg-gray-100 rounded-lg h-40 flex items-center justify-center mb-4">
-                  <span className="text-gray-500">Video Call Interface</span>
-                </div>
-                <div className="flex space-x-2">
-                  <div className="flex-1 bg-green-100 text-green-800 px-3 py-2 rounded-lg text-center text-sm font-medium">
-                    Connected
+              </div>
+              
+              <div className="absolute -bottom-4 -left-4 bg-white rounded-2xl p-4 shadow-xl border border-slate-200 animate-float-delayed">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                    <Brain className="w-5 h-5 text-blue-600" />
                   </div>
-                  <button className="bg-red-500 text-white px-4 py-2 rounded-lg">
-                    <Phone className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section id="features" className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Complete Healthcare Solution
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Our platform combines cutting-edge technology with personalized care to provide
-              you with the best telehealth experience possible.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-8 rounded-2xl hover:shadow-lg transition-shadow">
-              <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center mb-6">
-                <Calendar className="h-6 w-6 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Smart Appointment Booking</h3>
-              <p className="text-gray-600">
-                Seamless scheduling system that allows both doctors and patients to book chat or video consultations
-                with real-time availability checking.
-              </p>
-            </div>
-
-            <div className="bg-gradient-to-br from-green-50 to-green-100 p-8 rounded-2xl hover:shadow-lg transition-shadow">
-              <div className="w-12 h-12 bg-green-600 rounded-lg flex items-center justify-center mb-6">
-                <Video className="h-6 w-6 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">HD Video Consultations</h3>
-              <p className="text-gray-600">
-                Crystal-clear video calls with secure, HIPAA-compliant technology for face-to-face
-                consultations from the comfort of your home.
-              </p>
-            </div>
-
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-8 rounded-2xl hover:shadow-lg transition-shadow">
-              <div className="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center mb-6">
-                <MessageCircle className="h-6 w-6 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Secure Chat Messaging</h3>
-              <p className="text-gray-600">
-                Instant messaging with healthcare providers for quick questions, follow-ups,
-                and non-urgent medical consultations.
-              </p>
-            </div>
-
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-8 rounded-2xl hover:shadow-lg transition-shadow">
-              <div className="w-12 h-12 bg-orange-600 rounded-lg flex items-center justify-center mb-6">
-                <Brain className="h-6 w-6 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">AI Symptom Checker</h3>
-              <p className="text-gray-600">
-                Advanced AI-powered symptom analysis that provides preliminary health insights
-                and helps determine the urgency of your condition.
-              </p>
-            </div>
-
-            <div className="bg-gradient-to-br from-red-50 to-red-100 p-8 rounded-2xl hover:shadow-lg transition-shadow">
-              <div className="w-12 h-12 bg-red-600 rounded-lg flex items-center justify-center mb-6">
-                <FileText className="h-6 w-6 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Smart Report Analyzer</h3>
-              <p className="text-gray-600">
-                Upload medical reports and get AI-powered analysis with easy-to-understand
-                explanations of your test results and recommendations.
-              </p>
-            </div>
-
-            <div className="bg-gradient-to-br from-teal-50 to-teal-100 p-8 rounded-2xl hover:shadow-lg transition-shadow">
-              <div className="w-12 h-12 bg-teal-600 rounded-lg flex items-center justify-center mb-6">
-                <Shield className="h-6 w-6 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">HIPAA Compliant</h3>
-              <p className="text-gray-600">
-                Your health data is protected with enterprise-grade security and full HIPAA
-                compliance for complete peace of mind.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Services Section */}
-      <section id="services" className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Comprehensive Care Options
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Choose the type of consultation that best fits your needs and schedule.
-            </p>
-          </div>
-
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="space-y-8">
-              <div className="flex items-start space-x-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Video className="h-6 w-6 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Video Appointments</h3>
-                  <p className="text-gray-600">
-                    Face-to-face consultations with doctors through high-quality video calls.
-                    Perfect for detailed examinations and building personal connections with your healthcare provider.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <MessageCircle className="h-6 w-6 text-green-600" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Chat Consultations</h3>
-                  <p className="text-gray-600">
-                    Quick and convenient text-based consultations for non-urgent questions,
-                    prescription refills, and follow-up care.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Brain className="h-6 w-6 text-purple-600" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">AI Health Assistant</h3>
-                  <p className="text-gray-600">
-                    Get instant symptom analysis and health insights powered by advanced AI
-                    to help you understand your condition better.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <FileText className="h-6 w-6 text-orange-600" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Report Analysis</h3>
-                  <p className="text-gray-600">
-                    Upload lab results, X-rays, or other medical reports for AI-powered analysis
-                    with clear explanations in simple terms.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="relative">
-              <div className="bg-white rounded-2xl shadow-xl p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900">Upcoming Appointments</h3>
-                  <span className="text-sm text-gray-500">Today</span>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-4 p-4 bg-blue-50 rounded-lg">
-                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-                      <Video className="h-5 w-5 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">Dr. Michael Chen</p>
-                      <p className="text-sm text-gray-500">General Consultation</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-gray-900">2:30 PM</p>
-                      <p className="text-xs text-blue-600">Video Call</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-4 p-4 bg-green-50 rounded-lg">
-                    <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
-                      <MessageCircle className="h-5 w-5 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">Dr. Emily Rodriguez</p>
-                      <p className="text-sm text-gray-500">Follow-up Chat</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-gray-900">4:00 PM</p>
-                      <p className="text-xs text-green-600">Chat</p>
-                    </div>
+                  <div>
+                    <p className="text-xs text-slate-400">AI Assistant</p>
+                    <p className="text-sm font-semibold text-slate-700">Ready to Help</p>
                   </div>
                 </div>
-
-                <button className="w-full mt-6 bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 rounded-lg font-medium hover:from-blue-700 hover:to-blue-800 transition-all">
-                  Schedule New Appointment
-                </button>
               </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Stats Section */}
-      <section className="py-16 bg-blue-600">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8 text-center text-white">
-            <div>
-              <div className="text-4xl font-bold mb-2">50K+</div>
-              <div className="text-blue-100">Happy Patients</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold mb-2">500+</div>
-              <div className="text-blue-100">Certified Doctors</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold mb-2">24/7</div>
-              <div className="text-blue-100">Available Support</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold mb-2">98%</div>
-              <div className="text-blue-100">Satisfaction Rate</div>
             </div>
           </div>
         </div>
       </section>
 
       {/* How It Works */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section id="how-it-works" className="py-24 px-6 bg-slate-100/50">
+        <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              How It Works
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Getting started with HealthConnect is simple and straightforward.
+            <span className="text-blue-600 font-semibold text-sm uppercase tracking-wider">Simple Process</span>
+            <h2 className="text-4xl lg:text-5xl font-bold text-slate-800 mt-4 mb-6">How It Works</h2>
+            <p className="text-xl text-slate-500 max-w-2xl mx-auto">
+              Get started with remote healthcare consultations in three simple steps.
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-2xl font-bold text-blue-600">1</span>
+            {howItWorks.map((item, index) => (
+              <div key={index} className="relative group">
+                <div className="bg-white rounded-3xl p-8 border border-slate-200 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-500/5 transition-all duration-500">
+                  <div className="text-6xl font-bold text-blue-100 mb-4">{item.step}</div>
+                  <div className="w-14 h-14 bg-gradient-to-r from-blue-600 to-teal-500 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                    <item.icon className="w-7 h-7 text-white" />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-800 mb-3">{item.title}</h3>
+                  <p className="text-slate-500">{item.description}</p>
+                </div>
+                {index < 2 && (
+                  <div className="hidden md:block absolute top-1/2 -right-4 transform -translate-y-1/2 z-10">
+                    <ChevronRight className="w-8 h-8 text-blue-200" />
+                  </div>
+                )}
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Create Account</h3>
-              <p className="text-gray-600">
-                Sign up and complete your medical profile with our secure, user-friendly registration process.
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-2xl font-bold text-green-600">2</span>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Book Appointment</h3>
-              <p className="text-gray-600">
-                Choose your preferred doctor and appointment type - video call or chat consultation
-                based on your needs.
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-2xl font-bold text-purple-600">3</span>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Get Care</h3>
-              <p className="text-gray-600">
-                Connect with your doctor at the scheduled time and receive personalized healthcare
-                from anywhere.
-              </p>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* AI Features */}
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="text-4xl font-bold text-gray-900 mb-6">
-                AI-Powered Health Insights
-              </h2>
-              <p className="text-xl text-gray-600 mb-8">
-                Leverage the power of artificial intelligence to better understand your health
-                and make informed decisions about your care.
-              </p>
+      {/* Features */}
+      <section id="features" className="py-24 px-6 bg-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <span className="text-blue-600 font-semibold text-sm uppercase tracking-wider">Platform Capabilities</span>
+            <h2 className="text-4xl lg:text-5xl font-bold text-slate-800 mt-4 mb-6">Key Features</h2>
+            <p className="text-xl text-slate-500 max-w-2xl mx-auto">
+              Comprehensive telehealth features designed for seamless remote healthcare delivery.
+            </p>
+          </div>
 
-              <div className="space-y-6">
-                <div className="flex items-start space-x-4">
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                    <Check className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">Intelligent Symptom Analysis</h4>
-                    <p className="text-gray-600">
-                      Describe your symptoms and get AI-powered insights about potential conditions
-                      and recommended next steps.
-                    </p>
-                  </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {features.map((feature, index) => (
+              <div 
+                key={index}
+                className={`group bg-white rounded-2xl p-6 border border-slate-200 transition-all duration-300 hover:shadow-lg`}
+                
+              >
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-blue-600 to-teal-500 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <feature.icon className="w-6 h-6 text-white" />
                 </div>
-
-                <div className="flex items-start space-x-4">
-                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                    <Check className="h-5 w-5 text-green-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">Medical Report Interpretation</h4>
-                    <p className="text-gray-600">
-                      Upload lab results, imaging reports, or test results for clear,
-                      easy-to-understand explanations.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-4">
-                  <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                    <Check className="h-5 w-5 text-purple-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">Personalized Health Recommendations</h4>
-                    <p className="text-gray-600">
-                      Receive tailored health advice and lifestyle recommendations based on
-                      your medical history and current condition.
-                    </p>
-                  </div>
-                </div>
+                <h3 className="text-lg font-bold text-slate-800 mb-2">{feature.title}</h3>
+                <p className="text-slate-500 text-sm leading-relaxed">{feature.description}</p>
               </div>
-            </div>
+            ))}
+          </div>
 
-            <div className="relative">
-              <div className="bg-white rounded-2xl shadow-xl p-8">
-                <div className="flex items-center space-x-3 mb-6">
-                  <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                    <Brain className="h-5 w-5 text-white" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900">AI Health Assistant</h3>
+          {/* AI Features Highlight */}
+          <div className="mt-16 bg-gradient-to-r from-blue-50 via-teal-50 to-emerald-50 rounded-3xl p-8 lg:p-12 border border-blue-100">
+            <div className="grid lg:grid-cols-2 gap-12 items-center">
+              <div>
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 rounded-full mb-6">
+                  <Brain className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-700">AI-Powered Tools</span>
                 </div>
-
+                <h3 className="text-3xl font-bold text-slate-800 mb-4">Intelligent Health Assistance</h3>
+                <p className="text-slate-500 mb-6 leading-relaxed">
+                  Our demo showcases AI-powered features including a symptom checker and medical report analyzer. 
+                  These tools demonstrate how AI can assist in healthcare education and preliminary guidance.
+                </p>
                 <div className="space-y-4">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="text-sm text-gray-600 mb-2">You: "I've been having headaches and feeling tired lately"</p>
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <p className="text-slate-700">AI Symptom Checker for educational guidance</p>
                   </div>
-
-                  <div className="bg-blue-50 rounded-lg p-4">
-                    <p className="text-sm text-gray-800">
-                      <strong>AI Assistant:</strong> Based on your symptoms, this could be related to several factors including stress, dehydration, or sleep issues. I recommend:
-                    </p>
-                    <ul className="text-sm text-gray-700 mt-2 space-y-1">
-                      <li>• Ensure adequate hydration (8+ glasses of water daily)</li>
-                      <li>• Maintain consistent sleep schedule</li>
-                      <li>• Consider booking a consultation if symptoms persist</li>
-                    </ul>
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <p className="text-slate-700">Medical Report Summarization</p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <p className="text-slate-700">Natural language health queries</p>
                   </div>
                 </div>
-
-                <button className="w-full mt-6 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg font-medium hover:from-purple-600 hover:to-pink-600 transition-all">
-                  Try AI Symptom Checker
-                </button>
+              </div>
+              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-lg">
+                <div className="flex items-center gap-3 mb-4 pb-4 border-b border-slate-100">
+                  <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-teal-500 rounded-xl flex items-center justify-center">
+                    <Brain className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-slate-800">AI Symptom Checker</p>
+                    <p className="text-xs text-slate-400">Educational Demo</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="bg-slate-100 rounded-xl p-3">
+                    <p className="text-sm text-slate-400">User Input:</p>
+                    <p className="text-slate-700">"I've been experiencing headaches and fatigue"</p>
+                  </div>
+                  <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
+                    <p className="text-sm text-blue-600 font-medium mb-1">AI Analysis:</p>
+                    <p className="text-sm text-slate-700">Based on your symptoms, common causes may include stress, dehydration, or sleep issues. Please consult a healthcare provider for proper evaluation.</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Pricing */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    
+
+      {/* Technology Stack */}
+      <section id="tech" className="py-24 px-6 bg-white">
+        <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Simple, Transparent Pricing
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Choose the plan that works best for your healthcare needs.
+            <span className="text-blue-600 font-semibold text-sm uppercase tracking-wider">Built With Modern Tech</span>
+            <h2 className="text-4xl lg:text-5xl font-bold text-slate-800 mt-4 mb-6">Technology Stack</h2>
+            <p className="text-xl text-slate-500 max-w-2xl mx-auto">
+              Powered by cutting-edge technologies for reliable, scalable telehealth experiences.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-white border border-gray-200 rounded-2xl p-8 hover:shadow-lg transition-shadow">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Basic</h3>
-              <div className="text-4xl font-bold text-gray-900 mb-6">
-                $29<span className="text-lg text-gray-500">/month</span>
-              </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-center space-x-3">
-                  <Check className="h-5 w-5 text-green-500" />
-                  <span className="text-gray-600">2 Video consultations</span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <Check className="h-5 w-5 text-green-500" />
-                  <span className="text-gray-600">Unlimited chat consultations</span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <Check className="h-5 w-5 text-green-500" />
-                  <span className="text-gray-600">AI symptom checker</span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <Check className="h-5 w-5 text-green-500" />
-                  <span className="text-gray-600">Basic report analysis</span>
-                </li>
-              </ul>
-              <button className="w-full border border-blue-600 text-blue-600 py-3 rounded-lg font-medium hover:bg-blue-50 transition-colors">
-                Choose Basic
-              </button>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-2xl p-8 hover:shadow-lg transition-shadow">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Enterprise</h3>
-              <div className="text-4xl font-bold text-gray-900 mb-6">
-                $199<span className="text-lg text-gray-500">/month</span>
-              </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-center space-x-3">
-                  <Check className="h-5 w-5 text-green-500" />
-                  <span className="text-gray-600">Everything in Premium</span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <Check className="h-5 w-5 text-green-500" />
-                  <span className="text-gray-600">Multi-user family accounts</span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <Check className="h-5 w-5 text-green-500" />
-                  <span className="text-gray-600">Dedicated account manager</span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <Check className="h-5 w-5 text-green-500" />
-                  <span className="text-gray-600">Custom integrations</span>
-                </li>
-              </ul>
-              <button className="w-full border border-blue-600 text-blue-600 py-3 rounded-lg font-medium hover:bg-blue-50 transition-colors">
-                Contact Sales
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* About Section */}
-      <section id="about" className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="relative">
-              <div className="bg-gradient-to-br from-blue-100 to-indigo-200 rounded-2xl p-8 h-96 flex items-center justify-center">
-                <div className="text-center">
-                  <Users className="h-24 w-24 text-blue-600 mx-auto mb-4" />
-                  <p className="text-lg text-gray-700">Professional Healthcare Team</p>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {techStack.map((tech, index) => (
+              <div key={index} className="bg-white rounded-2xl p-6 border border-slate-200 hover:border-blue-300 hover:shadow-lg transition-all duration-300 text-center group">
+                <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-teal-500 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <tech.icon className="w-6 h-6 text-white" />
                 </div>
+                <h4 className="font-semibold text-slate-800 mb-1">{tech.name}</h4>
+                <p className="text-xs text-slate-400">{tech.description}</p>
               </div>
-            </div>
-
-            <div>
-              <h2 className="text-4xl font-bold text-gray-900 mb-6">
-                About HealthConnect
-              </h2>
-              <p className="text-lg text-gray-600 mb-6">
-                HealthConnect is revolutionizing healthcare delivery by making quality medical care
-                accessible to everyone, anywhere. Our platform connects patients with certified
-                healthcare professionals through secure, user-friendly technology.
-              </p>
-              <p className="text-lg text-gray-600 mb-8">
-                Founded by healthcare professionals and technology experts, we understand the
-                challenges of traditional healthcare and have built a solution that prioritizes
-                patient convenience without compromising on quality of care.
-              </p>
-
-              <div className="grid grid-cols-2 gap-6">
-                <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  <Clock className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-                  <p className="font-semibold text-gray-900">24/7 Availability</p>
-                  <p className="text-sm text-gray-600">Round-the-clock care</p>
-                </div>
-                <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <Shield className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                  <p className="font-semibold text-gray-900">Secure Platform</p>
-                  <p className="text-sm text-gray-600">HIPAA compliant</p>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-blue-600 to-indigo-700">
-        <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl font-bold text-white mb-6">
-            Ready to Transform Your Healthcare Experience?
-          </h2>
-          <p className="text-xl text-blue-100 mb-8">
-            Join thousands of patients who have already discovered the convenience
-            and quality of telehealth with HealthConnect.
+      <section className="py-24 px-6 bg-gradient-to-r from-blue-600 via-teal-500 to-blue-600">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-4xl lg:text-5xl font-bold text-white mb-6">Ready to Explore?</h2>
+          <p className="text-xl text-white/80 mb-8 max-w-2xl mx-auto">
+            Discover how modern telehealth technology can transform remote healthcare delivery.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="bg-white text-blue-600 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-gray-50 transition-colors">
-              Start Free Trial
+          <div className="flex flex-wrap justify-center gap-4">
+            <button className="px-8 py-4 bg-white text-blue-600 rounded-xl font-semibold hover:shadow-xl transition-all duration-300 flex items-center gap-2">
+              Explore Demo
+              <ArrowRight className="w-5 h-5" />
             </button>
-            <button className="border-2 border-white text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors">
-              Schedule Demo
-            </button>
+           
           </div>
         </div>
       </section>
 
-      {/* Contact Section */}
-      <section id="contact" className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Get in Touch
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Have questions about our platform? Our support team is here to help.
-            </p>
+      {/* Disclaimer */}
+      <section className="py-12 px-6 bg-slate-100 border-t border-slate-200">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 rounded-full mb-4">
+            <span className="text-sm font-medium text-blue-700">⚠️ Important Disclaimer</span>
           </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <Phone className="h-6 w-6 text-blue-600" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Phone Support</h3>
-              <p className="text-gray-600">+1 (555) 123-4567</p>
-              <p className="text-sm text-gray-500 mt-1">Available 24/7</p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <Mail className="h-6 w-6 text-green-600" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Email Support</h3>
-              <p className="text-gray-600">support@healthconnect.com</p>
-              <p className="text-sm text-gray-500 mt-1">Response within 2 hours</p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <MapPin className="h-6 w-6 text-purple-600" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Office Location</h3>
-              <p className="text-gray-600">123 Health Street</p>
-              <p className="text-gray-600">Medical District, NY 10001</p>
-            </div>
-          </div>
+          <p className="text-slate-500 leading-relaxed">
+            This is a <strong className="text-slate-700">portfolio demonstration project</strong> and is not a live medical service. 
+            The AI features are for educational and demonstration purposes only and do not provide real medical advice. 
+            Always consult qualified healthcare professionals for medical concerns.
+          </p>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold">H+</span>
-                </div>
-                <span className="text-lg font-bold">HealthConnect</span>
+      <footer className="py-12 px-6 bg-slate-800 text-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-blue-600 to-teal-500 flex items-center justify-center">
+                <Stethoscope className="w-5 h-5 text-white" />
               </div>
-              <p className="text-gray-400 mb-4">
-                Making healthcare accessible and convenient for everyone through innovative telehealth solutions.
-              </p>
+              <span className="text-xl font-bold">Tele-Health</span>
             </div>
-
-            <div>
-              <h4 className="text-lg font-semibold mb-4">Platform</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Video Consultations</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Chat Support</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">AI Health Tools</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Report Analysis</a></li>
-              </ul>
+            <p className="text-slate-400 text-sm">
+              © 2024 Tele-Health Demo. A portfolio project showcasing telehealth technology.
+            </p>
+            <div className="flex items-center gap-6">
+              <a href="#" className="text-slate-400 hover:text-white transition-colors text-sm">GitHub</a>
+              <a href="#" className="text-slate-400 hover:text-white transition-colors text-sm">LinkedIn</a>
+              <a href="#" className="text-slate-400 hover:text-white transition-colors text-sm">Contact</a>
             </div>
-
-            <div>
-              <h4 className="text-lg font-semibold mb-4">Company</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">About Us</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Press</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="text-lg font-semibold mb-4">Support</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Terms of Service</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contact Us</a></li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="border-t border-gray-800 mt-12 pt-8 text-center text-gray-400">
-            <p>&copy; 2025 HealthConnect. All rights reserved.</p>
           </div>
         </div>
       </footer>
@@ -733,5 +464,4 @@ const TelehealthLanding = () => {
   );
 };
 
-export default TelehealthLanding;
-
+export default Index;

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import connect from "@/lib/db"
+import connectDB from "@/lib/db"
 import Appointment from "@/models/Appointment"
 import DoctorAvailability from "@/models/DoctorAvailability"
 import { getDataFromToken } from "@/helper/getDataFromToken"
@@ -7,7 +7,7 @@ import { getDataFromToken } from "@/helper/getDataFromToken"
 // GET - Get specific appointment
 export async function GET(request, { params }) {
     try {
-        await connect()
+        await connectDB()
         const userId = await getDataFromToken(request)
         const { id } = await params
 
@@ -37,7 +37,7 @@ export async function GET(request, { params }) {
 // PUT - Update appointment
 export async function PUT(request, { params }) {
     try {
-        await connect()
+        await connectDB()
         const userId = await getDataFromToken(request)
         const { id } = params
         const body = await request.json()
@@ -73,7 +73,7 @@ export async function PUT(request, { params }) {
 // DELETE - Cancel appointment
 export async function DELETE(request, { params }) {
     try {
-        await connect()
+        await connectDB()
         const userId = await getDataFromToken(request)
         const { id } = params
 

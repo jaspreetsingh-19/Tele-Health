@@ -1,6 +1,6 @@
 import VideoCall from "@/models/VideoCall";
 import Appointment from "@/models/Appointment";
-import connect from "@/lib/db";
+import connectDB from "@/lib/db";
 import { v4 as uuidv4 } from "uuid";
 import { getDataFromToken } from "@/helper/getDataFromToken";
 import { NextResponse } from "next/server";
@@ -14,7 +14,7 @@ function generateRandom() {
 
 export async function POST(request) {
     try {
-        await connect();
+        await connectDB();
         console.log("startin initiate")
 
         const { appointmentId } = await request.json();

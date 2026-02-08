@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import connect from "@/lib/db";
+import connectDB from "@/lib/db";
 import Appointment from "@/models/Appointment";
 import { getDataFromToken } from "@/helper/getDataFromToken";
 
@@ -12,7 +12,7 @@ export async function GET(req) {
         }
 
         // 2️⃣ Connect to DB
-        await connect();
+        await connectDB();
 
         // 3️⃣ Fetch all appointments for this patient (paid, pending, failed, refunded)
         const appointments = await Appointment.find({

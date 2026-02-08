@@ -1,28 +1,24 @@
 import mongoose from "mongoose";
-import dotenv from "dotenv";
-dotenv.config();
-export default async function connect() {
-    try {
-        // Avoid duplicate connections
-        if (mongoose.connection.readyState === 1) {
-            console.log("✅ Already connected to MongoDB");
-            return;
-        }
 
+const MONGO_URI = process.env.MONGO_URI;
 
-        await mongoose.connect(process.env.MONGO_URI);
+if (!MONGO_URI) {
+  throw new Error("MONGO_URI not defined");
+}
 
-        mongoose.connection.on("connected", () => {
-            console.log("✅ DB connected");
-        });
+let cached = global.mongoose;
 
-        mongoose.connection.on("error", (err) => {
-            console.error("❌ DB connection error:", err);
-            process.exit(1);
-        });
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
 
-    } catch (e) {
-        console.error("❌ Error in connect():", e);
-        throw e;
-    }
+export default async function connectDB() {
+  if (cached.conn) return cached.conn;
+
+  if (!cached.promise) {
+    cached.promise = mongoose.connect(MONGO_URI).then((mongoose) => mongoose);
+  }
+
+  cached.conn = await cached.promise;
+  return cached.conn;
 }

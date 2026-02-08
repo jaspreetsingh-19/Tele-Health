@@ -43,6 +43,7 @@ const userSchema = new mongoose.Schema({
     patientProfile: {
         patientId: String,
         fullName: String,
+        patientPhoto: String,
         dob: Date,
         gender: {
             type: String,
@@ -76,7 +77,7 @@ const userSchema = new mongoose.Schema({
         doctorId: String,
         fullName: String,
         docPhoto: String,
-        specialization: [String], // Changed to array for multiple specializations
+        specialization: [String], 
         qualifications: String,
         experienceYears: Number,
         consultationFee: Number,

@@ -3,7 +3,7 @@ import next from "next";
 import { Server } from "socket.io";
 import ChatRoom from "./src/models/ChatRoom.js";
 import VideoCall from "./src/models/VideoCall.js";
-import connect from "./src/lib/db.js";
+import connectDB from "./src/lib/db.js";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "localhost";
@@ -13,7 +13,7 @@ const app = next({ dev, hostname, port });
 const handler = app.getRequestHandler();
 
 // Connect to MongoDB
-connect();
+connectDB();
 
 app.prepare().then(() => {
     const httpServer = createServer(handler);

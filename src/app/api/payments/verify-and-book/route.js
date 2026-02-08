@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import crypto from "crypto"
-import connect from "@/lib/db"
+import connectDB from "@/lib/db"
 import Appointment from "@/models/Appointment"
 import Razorpay from "razorpay"
 import ChatRoom from "@/models/ChatRoom"
@@ -17,7 +17,7 @@ function generateRoom() {
 
 export async function POST(request) {
     try {
-        await connect()
+        await connectDB()
         const userId = await getDataFromToken(request)
         const body = await request.json()
 

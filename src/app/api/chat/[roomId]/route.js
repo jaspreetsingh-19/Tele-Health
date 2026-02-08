@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server"
-import connect from "@/lib/db"
+import connectDB from "@/lib/db"
 import ChatRoom from "@/models/ChatRoom"
 import User from "@/models/user"
 import { getDataFromToken } from "@/helper/getDataFromToken"
 
 export async function GET(request, { params }) {
     try {
-        await connect()
+        await connectDB()
         const userId = await getDataFromToken(request)
         const { roomId } = params
 
@@ -73,7 +73,7 @@ export async function GET(request, { params }) {
 
 export async function POST(request, { params }) {
     try {
-        await connect()
+        await connectDB()
         const userId = await getDataFromToken(request)
         const { roomId } = params
         const body = await request.json()

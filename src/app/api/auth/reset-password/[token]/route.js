@@ -1,11 +1,11 @@
-import connect from "@/lib/db";
+import connectDB from "@/lib/db";
 import { NextResponse } from "next/server";
 import User from "@/models/user";
 import bcrypt from "bcryptjs";
 import { sendPasswordResetEmailSuccess } from "@/helper/mailtrap.config";
 
 export async function POST(request, { params }) {
-    await connect();
+    await connectDB();
 
 
     try {

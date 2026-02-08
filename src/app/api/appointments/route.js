@@ -1,6 +1,6 @@
 // api/appointments/route.js - Fixed version
 import { NextResponse } from "next/server"
-import connect from "@/lib/db"
+import connectDB from "@/lib/db"
 import Appointment from "@/models/Appointment"
 import User from "@/models/user"
 import DoctorAvailability from "@/models/DoctorAvailability"
@@ -16,7 +16,7 @@ function generateRoom() {
 // GET - Fetch appointments for user
 export async function GET(request) {
     try {
-        await connect()
+        await connectDB()
         const userId = await getDataFromToken(request)
         const { searchParams } = new URL(request.url)
         const role = searchParams.get("role") || "patient"
@@ -63,7 +63,7 @@ export async function GET(request) {
 // POST - Create new appointment
 export async function POST(request) {
     try {
-        await connect()
+        await connectDB()
         const userId = await getDataFromToken(request)
         const body = await request.json()
 

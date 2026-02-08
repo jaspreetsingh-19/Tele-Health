@@ -1,11 +1,12 @@
-import connect from "@/lib/db";
+import connectDB from "@/lib/db";
 import { NextResponse } from "next/server";
 import Symptom from "@/models/Symptom";
 import { getDataFromToken } from "@/helper/getDataFromToken";
 
-connect();
 
 export async function DELETE(request, context) {
+    await connectDB();
+
     try {
         const { params } = context; // Extract params
         const userId = await getDataFromToken(request);

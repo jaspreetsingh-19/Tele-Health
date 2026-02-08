@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server"
 import User from "@/models/user"
-import connect from "@/lib/db";
+import connectDB from "@/lib/db";
 
 
-connect();
+
 
 export async function GET(request) {
+await connectDB();
 
 
     try {
@@ -23,6 +24,7 @@ export async function GET(request) {
 
 
 export async function DELETE(request) {
+await connectDB();
 
     try {
         const { userId } = await request.json();

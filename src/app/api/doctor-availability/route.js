@@ -1,6 +1,6 @@
 // api/doctor-availability/route.js - Fixed version
 import { NextResponse } from "next/server"
-import connect from "@/lib/db"
+import connectDB from "@/lib/db"
 import DoctorAvailability from "@/models/DoctorAvailability"
 import User from "@/models/user"
 import { getDataFromToken } from "@/helper/getDataFromToken"
@@ -9,7 +9,7 @@ import { generateTimeSlots, formatDateForDB } from "@/utils/dateUtils"
 // GET - Get doctor availability
 export async function GET(request) {
     try {
-        await connect()
+        await connectDB()
         const { searchParams } = new URL(request.url)
         const doctorId = searchParams.get("doctorId")
         const date = searchParams.get("date")
@@ -61,7 +61,7 @@ export async function GET(request) {
 // POST - Create/Update doctor availability
 export async function POST(request) {
     try {
-        await connect()
+        await connectDB()
         const userId = await getDataFromToken(request)
         const body = await request.json()
 

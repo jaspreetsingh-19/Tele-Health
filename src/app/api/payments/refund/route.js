@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
 import Razorpay from "razorpay"
-import connect from "@/lib/db"
+import connectDB from "@/lib/db"
 import Appointment from "@/models/Appointment"
-import { getDataFromToken } from "@/helpers/getDataFromToken"
+import { getDataFromToken } from "@/helper/getDataFromToken"
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
@@ -11,7 +11,7 @@ const razorpay = new Razorpay({
 
 export async function POST(request) {
     try {
-        await connect()
+        await connectDB()
         const userId = await getDataFromToken(request)
         const body = await request.json()
         const { appointmentId, reason } = body
