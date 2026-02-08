@@ -6,16 +6,17 @@ import Razorpay from "razorpay"
 import ChatRoom from "@/models/ChatRoom"
 import { getDataFromToken } from "@/helper/getDataFromToken"
 
-const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET,
-})
+
 function generateRoom() {
     const randomNumber = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
     return randomNumber.toString();
 }
 
 export async function POST(request) {
+    const razorpay = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
+})
     try {
         await connectDB()
         const userId = await getDataFromToken(request)
