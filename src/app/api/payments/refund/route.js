@@ -4,12 +4,13 @@ import connectDB from "@/lib/db"
 import Appointment from "@/models/Appointment"
 import { getDataFromToken } from "@/helper/getDataFromToken"
 
-const razorpay = new Razorpay({
+
+
+export async function POST(request) {
+    const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_KEY_SECRET,
 })
-
-export async function POST(request) {
     try {
         await connectDB()
         const userId = await getDataFromToken(request)
