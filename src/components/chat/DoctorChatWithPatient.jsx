@@ -121,8 +121,9 @@ export default function DoctorChatWithPatient() {
     // Socket connection setup
     useEffect(() => {
         if (!chatRoom || !user) return
-
-        const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000", {
+console.log('🔌 Socket URL:', process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001")
+console.log('🌍 All env vars:', process.env)
+        const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001", {
             transports: ["websocket", "polling"],
         })
 
