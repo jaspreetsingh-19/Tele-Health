@@ -41,25 +41,29 @@ export async function POST(req) {
         // Generate or get existing room ID
         let roomId = appointment.roomId
         if (!roomId) {
-            roomId = `chat_${appointmentId}_${Date.now()}`
+            roomId = `chat_${appointmentId}`
             appointment.roomId = roomId
             await appointment.save()
         }
 
         // Find or create chat room
-        let chatRoom = await ChatRoom.findOne({ appointmentId })
-
-        if (!chatRoom) {
-            chatRoom = new ChatRoom({
-                roomId,
-                appointmentId,
-                patientId: appointment.patientId._id,
-                doctorId: appointment.doctorId._id,
-                messages: [],
-                isActive: true
-            })
-            await chatRoom.save()
+        let chatRoom = await ChatRoom.findOneAndUpdate(
+    { appointmentId },
+    {
+        $setOnInsert: {
+            roomId,
+            appointmentId,
+            patientId: appointment.patientId._id,
+            doctorId: appointment.doctorId._id,
+            messages: [],
+            isActive: true
         }
+    },
+    {
+        new: true,
+        upsert: true
+    }
+)
 
         // Populate the chat room with user details
         await chatRoom.populate([

@@ -1,3 +1,7 @@
+import "dotenv/config";
+
+console.log("MONGO_URI:", process.env.MONGO_URI);
+
 import { createServer } from "http";
 import next from "next";
 import { Server } from "socket.io";

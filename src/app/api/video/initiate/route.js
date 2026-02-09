@@ -6,10 +6,6 @@ import { getDataFromToken } from "@/helper/getDataFromToken";
 import { NextResponse } from "next/server";
 
 
-function generateRandom() {
-    const randomNumber = Math.floor(Math.random() * (999999 - 100000 + 1)) + 100000;
-    return randomNumber.toString();
-}
 
 
 export async function POST(request) {
@@ -31,14 +27,16 @@ export async function POST(request) {
 
         // Find the appointment
         const appointment = await Appointment.findOne({ appointmentId })
+
+
             .populate("patientId", "username avatar")
             .populate("doctorId", "username avatar");
-        console.log("appoi", appointment.patientId._id.toString(), userId)
-        if (!appointment) {
-            console.log("no appoi")
-            return NextResponse.json({ error: "Appointment not found" }, { status: 404 });
-        }
-
+            if (!appointment) {
+                console.log("no appoi")
+                return NextResponse.json({ error: "Appointment not found" }, { status: 404 });
+            }
+            console.log("appoi", appointment.patientId._id.toString(), userId)
+            
         // Determine userType
         let userType;
         if (appointment.patientId._id.toString() === userId) {
@@ -51,6 +49,11 @@ export async function POST(request) {
         }
 
 
+// Ensure appointment has a roomId (single source of truth)
+if (!appointment.roomId) {
+    appointment.roomId = `room_${appointment._id}`
+    await appointment.save()
+}
 
         // Generate unique identifiers
         let videoCall = await VideoCall.findOne({ appointmentId: appointment._id, isActive: true });
@@ -86,11 +89,7 @@ export async function POST(request) {
 
             await videoCall.save();
 
-            // Save roomId inside appointment if missing
-            if (!appointment.roomId) {
-                appointment.roomId = videoCall.roomId;
-                await appointment.save();
-            }
+          
         }
 
         // Return existing or newly created call
