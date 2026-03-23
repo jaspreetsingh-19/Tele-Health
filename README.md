@@ -1,6 +1,6 @@
 # 🏥 TeleHealth — Online Healthcare Consultation Platform
 
-> A full-stack telehealth web application built as a resume showcase project. Connects patients with doctors through real-time video calls and chat, with AI-powered health tools, secure payments, and a complete admin panel.
+> A full-stack telehealth web application built as a showcase project. Connects patients with doctors through real-time video calls and chat, with AI-powered health tools, secure payments, and a complete admin panel.
 
 ---
 
