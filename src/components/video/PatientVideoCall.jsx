@@ -99,6 +99,7 @@ export default function PatientVideoCall() {
             if (!appointmentId || !user) return
             try {
                 const response = await axios.get(`/api/appointments/${appointmentId}`)
+                console.log("TIMESLOT DEBUG:", JSON.stringify(response.data.appointment.timeSlot))
                 setAppointmentDetails(response.data.appointment)
             } catch (err) {
                 toast.error("Failed to load appointment details")
