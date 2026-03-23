@@ -2,6 +2,8 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import ChatRoom from "./src/models/ChatRoom.js";
 import VideoCall from "./src/models/VideoCall.js";
+import User from "./src/models/user.js";
+
 import connectDB from "./src/lib/db.js";
 
 const port = process.env.PORT || 3001;
@@ -10,7 +12,12 @@ const port = process.env.PORT || 3001;
 connectDB();
 
 // ✅ CREATE SIMPLE HTTP SERVER (removed Next.js)
-const httpServer = createServer();
+const httpServer = createServer((req, res) => {
+    if (req.url === "/health") {
+        res.writeHead(200);
+        res.end("OK");
+    }
+});
 
 const io = new Server(httpServer, {
     cors: {
