@@ -603,7 +603,7 @@ httpServer
         console.error("❌ Server error:", err);
         process.exit(1);
     })
-    .listen(port, () => {
+    .listen(port, "0.0.0.0", () => { // FIX: bind to 0.0.0.0 so Render exposes the port
         console.log(`🚀 Socket.io server ready on port ${port}`);
         console.log("🔌 Socket.IO server initialized with WebRTC support");
     });
