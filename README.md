@@ -407,8 +407,8 @@ The Socket.io server acts purely as a **signaling server** — once the WebRTC c
 ## 🙋 Author
 
 **Jaspreet Singh**
-- GitHub: `<!-- add your GitHub profile URL -->`
-- LinkedIn: `<!-- add your LinkedIn URL -->`
+- GitHub: https://github.com/jaspreetsingh-19
+- LinkedIn: https://www.linkedin.com/in/jaspreetsingh1900/
 - Email: jaspreetsingh7192006@gmail.com
 
 ---
