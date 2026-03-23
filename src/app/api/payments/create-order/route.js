@@ -33,7 +33,8 @@ export async function POST(request) {
             return NextResponse.json({ success: false, message: "Doctor not found" }, { status: 404 })
         }
 
-        const consultationFee = doctor.doctorProfile.consultationFee
+        const baseFee = doctor.doctorProfile.consultationFee
+const consultationFee = consultationType === "chat" ? Math.round(baseFee * 0.5) : baseFee
 
         // Create Razorpay order with appointment data in notes
         const options = {

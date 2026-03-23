@@ -24,7 +24,9 @@ export default function BookingModal({ doctor, selectedDate, selectedSlot, onClo
         patientNotes: "",
     })
     const [loading, setLoading] = useState(false)
-
+const consultationFee = formData.consultationType === "chat"
+    ? Math.round(doctor.doctorProfile.consultationFee * 0.5)
+    : doctor.doctorProfile.consultationFee
     const loadRazorpayScript = () => {
         return new Promise((resolve) => {
             const script = document.createElement('script');
@@ -198,8 +200,11 @@ export default function BookingModal({ doctor, selectedDate, selectedSlot, onClo
                                     </p>
                                 </div>
                                 <Badge className="bg-primary text-primary-foreground flex-shrink-0 text-xs md:text-sm">
-                                    ₹{doctor.doctorProfile.consultationFee}
-                                </Badge>
+    ₹{consultationFee}
+    {formData.consultationType === "chat" && (
+        <span className="ml-1 line-through text-xs opacity-60">₹{doctor.doctorProfile.consultationFee}</span>
+    )}
+</Badge>
                             </div>
                         </div>
 
@@ -215,14 +220,14 @@ export default function BookingModal({ doctor, selectedDate, selectedSlot, onClo
                                     <RadioGroupItem value="video" id="video" />
                                     <Label htmlFor="video" className="flex items-center gap-2 cursor-pointer text-sm md:text-base">
                                         <Video className="h-4 w-4 text-primary" />
-                                        Video Call
+                                        Video Call — ₹{doctor.doctorProfile.consultationFee}
                                     </Label>
                                 </div>
                                 <div className="flex items-center space-x-2">
                                     <RadioGroupItem value="chat" id="chat" />
                                     <Label htmlFor="chat" className="flex items-center gap-2 cursor-pointer text-sm md:text-base">
                                         <MessageCircle className="h-4 w-4 text-primary" />
-                                        Chat
+                                        Chat — ₹{Math.round(doctor.doctorProfile.consultationFee * 0.5)}
                                     </Label>
                                 </div>
                             </RadioGroup>
@@ -266,8 +271,8 @@ export default function BookingModal({ doctor, selectedDate, selectedSlot, onClo
                                 <span className="font-medium text-sm md:text-base">Payment Information</span>
                             </div>
                             <p className="text-xs md:text-sm text-muted-foreground">
-                                You will be redirected to secure payment gateway to complete the payment of ₹
-                                {doctor.doctorProfile.consultationFee}. Your appointment will only be confirmed after successful payment.
+                                You will be redirected to secure payment gateway to complete the 
+                                payment of ₹{consultationFee}. Your appointment will only be confirmed after successful payment.
                             </p>
                         </div>
 
