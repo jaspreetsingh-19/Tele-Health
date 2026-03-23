@@ -8,14 +8,14 @@ export const useSocket = () => {
     useEffect(() => {
         console.log('🔌 Initializing socket connection...')
 
-        const socketInstance = io('http://localhost:3000', {
+        const socketInstance = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000', {
             transports: ['websocket', 'polling'],
             autoConnect: true,
             reconnection: true,
             reconnectionDelay: 1000,
             reconnectionDelayMax: 5000,
-            maxReconnectionAttempts: 5,
-            timeout: 20000,
+            maxReconnectionAttempts: 10,
+            timeout: 30000,
             forceNew: true
         })
 
