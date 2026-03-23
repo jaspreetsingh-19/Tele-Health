@@ -210,7 +210,7 @@ tele-health/
 ### 1. Clone the repository
 
 ```bash
-git clone <!-- your repo URL -->
+git clone https://github.com/jaspreetsingh-19/Tele-Health.git
 cd tele-health
 npm install
 ```
@@ -409,7 +409,7 @@ The Socket.io server acts purely as a **signaling server** — once the WebRTC c
 **Jaspreet Singh**
 - GitHub: `<!-- add your GitHub profile URL -->`
 - LinkedIn: `<!-- add your LinkedIn URL -->`
-- Email: `<!-- add your email -->`
+- Email: jaspreetsingh7192006@gmail.com
 
 ---
 
