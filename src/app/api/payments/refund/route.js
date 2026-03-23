@@ -3,6 +3,7 @@ import Razorpay from "razorpay"
 import connectDB from "@/lib/db"
 import Appointment from "@/models/Appointment"
 import { getDataFromToken } from "@/helper/getDataFromToken"
+import Payment from "@/models/Payment"
 
 
 
@@ -50,6 +51,10 @@ export async function POST(request) {
         appointment.paymentStatus = "refunded"
         appointment.status = "cancelled"
         await appointment.save()
+        await Payment.findOneAndUpdate(
+    { paymentId: appointment.paymentId },
+    { status: "refunded", updatedAt: new Date() }
+)
 
         return NextResponse.json({
             success: true,

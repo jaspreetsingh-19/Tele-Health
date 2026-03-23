@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect } from "react"
-import { Calendar, Clock, Video, MessageCircle, FileText, Filter, Copy, Check } from "lucide-react"
+import { Calendar, Clock, Video, MessageCircle, FileText, Filter, AlertTriangle, IndianRupee } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -9,6 +9,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 
@@ -21,6 +31,10 @@ export default function PatientAppointmentsPage() {
         date: "",
         consultationType: "all",
     })
+
+    // Cancel dialog state
+    const [cancelDialog, setCancelDialog] = useState({ open: false, appointment: null })
+    const [cancelling, setCancelling] = useState(false)
 
     const fetchAppointments = async () => {
         try {
@@ -36,11 +50,11 @@ export default function PatientAppointmentsPage() {
 
             if (data.success) {
                 let filteredAppointments = data.appointments
-
                 if (filter.consultationType !== "all") {
-                    filteredAppointments = filteredAppointments.filter((apt) => apt.consultationType === filter.consultationType)
+                    filteredAppointments = filteredAppointments.filter(
+                        (apt) => apt.consultationType === filter.consultationType
+                    )
                 }
-
                 setAppointments(filteredAppointments)
             }
         } catch (error) {
@@ -51,25 +65,31 @@ export default function PatientAppointmentsPage() {
         }
     }
 
-    const cancelAppointment = async (appointmentId) => {
+    // Opens dialog instead of cancelling directly
+    const handleCancelClick = (appointmentId) => {
+        const appointment = appointments.find((apt) => apt._id === appointmentId)
+        setCancelDialog({ open: true, appointment })
+    }
+
+    // Actually performs the cancel + refund
+    const confirmCancel = async () => {
+        const appointment = cancelDialog.appointment
+        if (!appointment) return
+
         try {
-            const appointment = appointments.find((apt) => apt._id === appointmentId)
+            setCancelling(true)
             let response
 
             if (appointment.paymentStatus === "paid") {
-                // Call refund route
                 response = await fetch(`/api/payments/refund`, {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         appointmentId: appointment._id,
                         reason: "User cancelled",
                     }),
                 })
             } else {
-                // Call simple delete route
                 response = await fetch(`/api/appointments/${appointment._id}`, {
                     method: "DELETE",
                 })
@@ -78,7 +98,11 @@ export default function PatientAppointmentsPage() {
             const data = await response.json()
 
             if (response.ok && data.success) {
-                toast.success("Appointment cancelled successfully")
+                if (appointment.paymentStatus === "paid") {
+                    toast.success(`Appointment cancelled. Refund of ₹${appointment.consultationFee} initiated — takes 5–7 business days.`)
+                } else {
+                    toast.success("Appointment cancelled successfully.")
+                }
                 fetchAppointments()
             } else {
                 toast.error(data.message || "Failed to cancel appointment")
@@ -86,14 +110,15 @@ export default function PatientAppointmentsPage() {
         } catch (error) {
             console.error("Error cancelling appointment:", error)
             toast.error("Something went wrong")
+        } finally {
+            setCancelling(false)
+            setCancelDialog({ open: false, appointment: null })
         }
     }
 
-    // Fixed date comparison functions
     const getTodayAppointments = () => {
         const today = new Date()
         today.setHours(0, 0, 0, 0)
-
         return appointments.filter((apt) => {
             const aptDate = new Date(apt.appointmentDate)
             aptDate.setHours(0, 0, 0, 0)
@@ -103,8 +128,7 @@ export default function PatientAppointmentsPage() {
 
     const getUpcomingAppointments = () => {
         const today = new Date()
-        today.setHours(23, 59, 59, 999) // End of today
-
+        today.setHours(23, 59, 59, 999)
         return appointments.filter((apt) => {
             const aptDate = new Date(apt.appointmentDate)
             return aptDate > today && apt.status === "scheduled"
@@ -125,6 +149,7 @@ export default function PatientAppointmentsPage() {
 
     const todayAppointments = getTodayAppointments()
     const upcomingAppointments = getUpcomingAppointments()
+    const selectedAppointment = cancelDialog.appointment
 
     return (
         <div className="space-y-4 sm:space-y-6 p-3 sm:p-0">
@@ -157,9 +182,7 @@ export default function PatientAppointmentsPage() {
                         <div className="space-y-2">
                             <Label className="text-sm">Status</Label>
                             <Select value={filter.status} onValueChange={(value) => setFilter({ ...filter, status: value })}>
-                                <SelectTrigger className="text-sm">
-                                    <SelectValue />
-                                </SelectTrigger>
+                                <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">All Status</SelectItem>
                                     <SelectItem value="scheduled">Scheduled</SelectItem>
@@ -169,16 +192,10 @@ export default function PatientAppointmentsPage() {
                                 </SelectContent>
                             </Select>
                         </div>
-
                         <div className="space-y-2">
                             <Label className="text-sm">Consultation Type</Label>
-                            <Select
-                                value={filter.consultationType}
-                                onValueChange={(value) => setFilter({ ...filter, consultationType: value })}
-                            >
-                                <SelectTrigger className="text-sm">
-                                    <SelectValue />
-                                </SelectTrigger>
+                            <Select value={filter.consultationType} onValueChange={(value) => setFilter({ ...filter, consultationType: value })}>
+                                <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">All Types</SelectItem>
                                     <SelectItem value="video">Video Call</SelectItem>
@@ -186,7 +203,6 @@ export default function PatientAppointmentsPage() {
                                 </SelectContent>
                             </Select>
                         </div>
-
                         <div className="space-y-2">
                             <Label className="text-sm">Date</Label>
                             <Input
@@ -196,7 +212,6 @@ export default function PatientAppointmentsPage() {
                                 className="text-sm"
                             />
                         </div>
-
                         <div className="flex items-end">
                             <Button
                                 variant="outline"
@@ -210,17 +225,12 @@ export default function PatientAppointmentsPage() {
                 </CardContent>
             </Card>
 
+            {/* Tabs */}
             <Tabs defaultValue="today" className="space-y-4 sm:space-y-6">
                 <TabsList className="grid w-full grid-cols-3 h-auto">
-                    <TabsTrigger value="today" className="text-xs sm:text-sm">
-                        Today's
-                    </TabsTrigger>
-                    <TabsTrigger value="upcoming" className="text-xs sm:text-sm">
-                        Upcoming
-                    </TabsTrigger>
-                    <TabsTrigger value="all" className="text-xs sm:text-sm">
-                        All
-                    </TabsTrigger>
+                    <TabsTrigger value="today" className="text-xs sm:text-sm">Today's</TabsTrigger>
+                    <TabsTrigger value="upcoming" className="text-xs sm:text-sm">Upcoming</TabsTrigger>
+                    <TabsTrigger value="all" className="text-xs sm:text-sm">All</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="today">
@@ -244,7 +254,7 @@ export default function PatientAppointmentsPage() {
                                 <PatientAppointmentCard
                                     key={appointment._id}
                                     appointment={appointment}
-                                    onCancel={cancelAppointment}
+                                    onCancel={handleCancelClick}
                                     onNavigateToChat={navigateToChat}
                                     onNavigateToVideoCall={navigateToVideoCall}
                                 />
@@ -270,7 +280,7 @@ export default function PatientAppointmentsPage() {
                                 <PatientAppointmentCard
                                     key={appointment._id}
                                     appointment={appointment}
-                                    onCancel={cancelAppointment}
+                                    onCancel={handleCancelClick}
                                     onNavigateToChat={navigateToChat}
                                     onNavigateToVideoCall={navigateToVideoCall}
                                 />
@@ -296,7 +306,7 @@ export default function PatientAppointmentsPage() {
                                 <PatientAppointmentCard
                                     key={appointment._id}
                                     appointment={appointment}
-                                    onCancel={cancelAppointment}
+                                    onCancel={handleCancelClick}
                                     onNavigateToChat={navigateToChat}
                                     onNavigateToVideoCall={navigateToVideoCall}
                                 />
@@ -305,101 +315,125 @@ export default function PatientAppointmentsPage() {
                     </div>
                 </TabsContent>
             </Tabs>
+
+            {/* ── Cancel / Refund Confirmation Dialog ── */}
+            <AlertDialog open={cancelDialog.open} onOpenChange={(open) => !cancelling && setCancelDialog({ open, appointment: null })}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2">
+                            <AlertTriangle className="h-5 w-5 text-destructive" />
+                            Cancel Appointment
+                        </AlertDialogTitle>
+                        <AlertDialogDescription asChild>
+                            <div className="space-y-3 text-sm text-muted-foreground">
+                                <p>Are you sure you want to cancel this appointment?</p>
+
+                                {selectedAppointment && (
+                                    <div className="bg-muted rounded-lg p-3 space-y-1.5 text-foreground text-xs">
+                                        <p><span className="font-medium">Doctor:</span> Dr. {selectedAppointment.doctorId?.doctorProfile?.fullName || selectedAppointment.doctorId?.username}</p>
+                                        <p><span className="font-medium">Date:</span> {new Date(selectedAppointment.appointmentDate).toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
+                                        <p><span className="font-medium">Time:</span> {selectedAppointment.timeSlot?.startTime} – {selectedAppointment.timeSlot?.endTime}</p>
+                                        <p><span className="font-medium">Fee:</span> ₹{selectedAppointment.consultationFee}</p>
+                                    </div>
+                                )}
+
+                                {selectedAppointment?.paymentStatus === "paid" ? (
+                                    <div className="flex items-start gap-2 bg-green-50 border border-green-200 rounded-lg p-3 text-green-800">
+                                        <IndianRupee className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                                        <div>
+                                            <p className="font-medium text-sm">Refund eligible</p>
+                                            <p className="text-xs mt-0.5">₹{selectedAppointment.consultationFee} will be refunded to your original payment method within 5–7 business days.</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-start gap-2 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-yellow-800">
+                                        <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                                        <p className="text-xs">No refund applicable as payment was not completed.</p>
+                                    </div>
+                                )}
+
+                                <p className="text-xs text-muted-foreground">This action cannot be undone.</p>
+                            </div>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={cancelling}>Keep Appointment</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmCancel}
+                            disabled={cancelling}
+                            className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                        >
+                            {cancelling ? (
+                                <span className="flex items-center gap-2">
+                                    <div className="h-3 w-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                    {selectedAppointment?.paymentStatus === "paid" ? "Processing Refund..." : "Cancelling..."}
+                                </span>
+                            ) : (
+                                selectedAppointment?.paymentStatus === "paid" ? "Cancel & Refund" : "Cancel Appointment"
+                            )}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }
 
 function PatientAppointmentCard({ appointment, onCancel, onNavigateToChat, onNavigateToVideoCall }) {
-    const [copiedRoomId, setCopiedRoomId] = useState(false)
     const [, forceTimeTick] = useState(0)
     useEffect(() => {
         const id = setInterval(() => forceTimeTick((t) => t + 1), 30000)
         return () => clearInterval(id)
     }, [])
 
-    // Fixed date formatting function
     const formatDate = (dateString) => {
         const date = new Date(dateString)
         return date.toLocaleDateString("en-IN", {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-            timeZone: "Asia/Kolkata",
+            weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Kolkata",
         })
     }
 
     const formatTime = (timeString) => {
         return new Date(`2000-01-01T${timeString}`).toLocaleTimeString("en-US", {
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
+            hour: "numeric", minute: "2-digit", hour12: true,
         })
     }
 
     const getStatusColor = (status) => {
         switch (status) {
-            case "scheduled":
-                return "bg-primary text-primary-foreground"
-            case "completed":
-                return "bg-accent text-accent-foreground"
-            case "cancelled":
-                return "bg-destructive text-destructive-foreground"
-            case "no-show":
-                return "bg-muted text-muted-foreground"
-            default:
-                return "bg-secondary text-secondary-foreground"
+            case "scheduled": return "bg-primary text-primary-foreground"
+            case "completed": return "bg-accent text-accent-foreground"
+            case "cancelled": return "bg-destructive text-destructive-foreground"
+            case "no-show": return "bg-muted text-muted-foreground"
+            default: return "bg-secondary text-secondary-foreground"
         }
     }
 
     const getPaymentStatusColor = (status) => {
         switch (status) {
-            case "paid":
-                return "bg-accent text-accent-foreground"
-            case "pending":
-                return "bg-secondary text-secondary-foreground"
-            case "failed":
-                return "bg-destructive text-destructive-foreground"
-            default:
-                return "bg-muted text-muted-foreground"
+            case "paid": return "bg-accent text-accent-foreground"
+            case "pending": return "bg-secondary text-secondary-foreground"
+            case "refunded": return "bg-blue-100 text-blue-700"
+            case "failed": return "bg-destructive text-destructive-foreground"
+            default: return "bg-muted text-muted-foreground"
         }
-    }
-
-    const copyRoomId = async () => {
-        try {
-            await navigator.clipboard.writeText(appointment.roomId)
-            setCopiedRoomId(true)
-            setTimeout(() => setCopiedRoomId(false), 2000)
-            toast.success("Room ID copied to clipboard")
-        } catch (err) {
-            console.error("Failed to copy room ID:", err)
-            toast.error("Failed to copy room ID")
-        }
-    }
-
-    const canStartChat = () => {
-        if (appointment.status !== "scheduled") return false
-        if (appointment.consultationType !== "chat") return false
-
-        const start = new Date(appointment.appointmentDate)
-        const [h, m] = String(appointment.timeSlot?.startTime || "00:00")
-            .split(":")
-            .map(Number)
-        start.setHours(h || 0, m || 0, 0, 0)
-
-        return Date.now() >= start.getTime() - 15 * 60 * 1000
     }
 
     const canJoinVideo = () => {
         if (appointment.status !== "scheduled") return false
         if (appointment.consultationType !== "video") return false
-
         const start = new Date(appointment.appointmentDate)
-        const [h, m] = String(appointment.timeSlot?.startTime || "00:00")
-            .split(":")
-            .map(Number)
+        const [h, m] = String(appointment.timeSlot?.startTime || "00:00").split(":").map(Number)
         start.setHours(h || 0, m || 0, 0, 0)
+        return Date.now() >= start.getTime() - 15 * 60 * 1000
+    }
 
+    const canStartChat = () => {
+        if (appointment.status !== "scheduled") return false
+        if (appointment.consultationType !== "chat") return false
+        const start = new Date(appointment.appointmentDate)
+        const [h, m] = String(appointment.timeSlot?.startTime || "00:00").split(":").map(Number)
+        start.setHours(h || 0, m || 0, 0, 0)
         return Date.now() >= start.getTime() - 15 * 60 * 1000
     }
 
@@ -412,8 +446,7 @@ function PatientAppointmentCard({ appointment, onCancel, onNavigateToChat, onNav
                             <Avatar className="h-10 w-10 sm:h-12 sm:w-12 self-start sm:self-center">
                                 <AvatarImage src={appointment.doctorId?.avatar || "/placeholder.svg"} />
                                 <AvatarFallback className="bg-primary text-primary-foreground text-sm">
-                                    {appointment.doctorId?.doctorProfile?.fullName?.charAt(0) ||
-                                        appointment.doctorId?.username?.charAt(0)}
+                                    {appointment.doctorId?.doctorProfile?.fullName?.charAt(0) || appointment.doctorId?.username?.charAt(0)}
                                 </AvatarFallback>
                             </Avatar>
                             <div className="space-y-2 min-w-0 flex-1">
@@ -423,9 +456,7 @@ function PatientAppointmentCard({ appointment, onCancel, onNavigateToChat, onNav
                                     </span>
                                     <div className="flex gap-2 flex-wrap">
                                         <Badge className={`${getStatusColor(appointment.status)} text-xs`}>{appointment.status}</Badge>
-                                        <Badge className={`${getPaymentStatusColor(appointment.paymentStatus)} text-xs`}>
-                                            {appointment.paymentStatus}
-                                        </Badge>
+                                        <Badge className={`${getPaymentStatusColor(appointment.paymentStatus)} text-xs`}>{appointment.paymentStatus}</Badge>
                                     </div>
                                 </div>
                                 <p className="text-xs sm:text-sm text-muted-foreground">
@@ -441,16 +472,13 @@ function PatientAppointmentCard({ appointment, onCancel, onNavigateToChat, onNav
                             </div>
                             <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
                                 <Clock className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                                <span>
-                                    {formatTime(appointment.timeSlot.startTime)} - {formatTime(appointment.timeSlot.endTime)}
-                                </span>
+                                <span>{formatTime(appointment.timeSlot.startTime)} - {formatTime(appointment.timeSlot.endTime)}</span>
                             </div>
                             <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-                                {appointment.consultationType === "video" ? (
-                                    <Video className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                                ) : (
-                                    <MessageCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                                )}
+                                {appointment.consultationType === "video"
+                                    ? <Video className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                    : <MessageCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                }
                                 <span>{appointment.consultationType === "video" ? "Video Call" : "Chat"}</span>
                             </div>
                         </div>
@@ -459,14 +487,10 @@ function PatientAppointmentCard({ appointment, onCancel, onNavigateToChat, onNav
                             <span className="font-medium">Symptoms: </span>
                             <span className="text-muted-foreground">{appointment.symptoms}</span>
                         </div>
-
                         <div className="text-xs sm:text-sm">
                             <span className="font-medium">Fee: </span>
                             <span className="text-muted-foreground">₹{appointment.consultationFee}</span>
                         </div>
-
-                       
-                        
                     </div>
 
                     <div className="flex flex-col gap-2 w-full lg:w-auto lg:min-w-[180px]">
@@ -477,7 +501,7 @@ function PatientAppointmentCard({ appointment, onCancel, onNavigateToChat, onNav
                                 onClick={() => onCancel(appointment._id)}
                                 className="text-xs sm:text-sm w-full"
                             >
-                                Cancel
+                                {appointment.paymentStatus === "paid" ? "Cancel & Refund" : "Cancel"}
                             </Button>
                         )}
 
