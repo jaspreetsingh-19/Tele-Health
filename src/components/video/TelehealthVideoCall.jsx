@@ -89,10 +89,12 @@ export default function TelehealthVideoCall({
     userId,
     roomId,
     username,
+
     userType,
     patientInfo,
     doctorInfo,
-    timeSlot,           // pass this from parent
+    timeSlot,
+    appointmentDate,           // pass this from parent
     onCallEnd = () => console.log("Call ended")
 }) {
     const socketRef = useRef(null);
@@ -116,17 +118,18 @@ export default function TelehealthVideoCall({
     const [connectionQuality, setConnectionQuality] = useState('good');
     const [isTyping, setIsTyping] = useState(false);
     const [isLocalVideoMinimized, setIsLocalVideoMinimized] = useState(false);
-    const [timeStatus, setTimeStatus] = useState(() => getCallTimeStatus(timeSlot));
+    const [timeStatus, setTimeStatus] = useState(() => getCallTimeStatus(timeSlot, appointmentDate))
+
 
     const otherUser = userType === 'patient' ? doctorInfo : patientInfo;
 
     // Re-check time every 30s
     useEffect(() => {
-        const interval = setInterval(() => {
-            setTimeStatus(getCallTimeStatus(timeSlot));
-        }, 30000);
-        return () => clearInterval(interval);
-    }, [timeSlot]);
+    const interval = setInterval(() => {
+        setTimeStatus(getCallTimeStatus(timeSlot, appointmentDate))
+    }, 30000)
+    return () => clearInterval(interval)
+}, [timeSlot, appointmentDate])
 
     // Block if time expired while in call
     useEffect(() => {

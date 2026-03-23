@@ -37,37 +37,26 @@ const useAuth = () => {
 }
 
 // Check if current time is within the appointment window (5 min early, 30 min after end)
-function getCallTimeStatus(timeSlot) {
-    if (!timeSlot) return { allowed: true }
+function getCallTimeStatus(timeSlot, appointmentDate) {
+    if (!timeSlot || !appointmentDate) return { allowed: true }
     try {
         const now = new Date()
-        let start, end
+        
+        // Get just the date part from appointmentDate
+        const dateStr = new Date(appointmentDate).toISOString().split('T')[0]
+        
+        const start = new Date(`${dateStr}T${timeSlot.startTime}:00`)
+        const end = timeSlot.endTime
+            ? new Date(`${dateStr}T${timeSlot.endTime}:00`)
+            : new Date(start.getTime() + 30 * 60 * 1000)
 
-        if (timeSlot.startTime && timeSlot.date) {
-            const dateStr = typeof timeSlot.date === 'string'
-                ? timeSlot.date.split('T')[0]
-                : new Date(timeSlot.date).toISOString().split('T')[0]
-            start = new Date(`${dateStr}T${timeSlot.startTime}:00`)
-            end = timeSlot.endTime
-                ? new Date(`${dateStr}T${timeSlot.endTime}:00`)
-                : new Date(start.getTime() + 30 * 60 * 1000)
-        } else if (timeSlot.startTime) {
-            start = new Date(timeSlot.startTime)
-            end = timeSlot.endTime
-                ? new Date(timeSlot.endTime)
-                : new Date(start.getTime() + 30 * 60 * 1000)
-        } else {
-            return { allowed: true }
-        }
-
-        const windowStart = new Date(start.getTime() - 5 * 60 * 1000)
-        const windowEnd = new Date(end.getTime() + 30 * 60 * 1000)
+        const windowStart = new Date(start.getTime() - 5 * 60 * 1000)   // 5 min early
+        const windowEnd = new Date(end.getTime() + 30 * 60 * 1000)       // 30 min after end
 
         if (now < windowStart) {
             return {
                 allowed: false, reason: 'early',
-                minutesUntilStart: Math.ceil((windowStart - now) / 60000),
-                startTime: start
+                minutesUntilStart: Math.ceil((windowStart - now) / 60000)
             }
         }
         if (now > windowEnd) {
@@ -78,6 +67,7 @@ function getCallTimeStatus(timeSlot) {
         }
         return { allowed: true }
     } catch (e) {
+        console.error('timeSlot parse error:', e)
         return { allowed: true }
     }
 }
@@ -99,7 +89,7 @@ export default function PatientVideoCall() {
             if (!appointmentId || !user) return
             try {
                 const response = await axios.get(`/api/appointments/${appointmentId}`)
-                console.log("TIMESLOT DEBUG:", JSON.stringify(response.data.appointment.timeSlot))
+                
                 setAppointmentDetails(response.data.appointment)
             } catch (err) {
                 toast.error("Failed to load appointment details")
@@ -108,11 +98,12 @@ export default function PatientVideoCall() {
         fetchAppointmentDetails()
     }, [appointmentId, user])
 
-    const timeStatus = appointmentDetails ? getCallTimeStatus(appointmentDetails.timeSlot) : { allowed: true }
+    // AFTER
+const timeStatus = appointmentDetails ? getCallTimeStatus(appointmentDetails.timeSlot, appointmentDetails.appointmentDate) : { allowed: true }
 
     const initiateVideoCall = async () => {
         // Double-check time before initiating
-        const status = getCallTimeStatus(appointmentDetails?.timeSlot)
+        const status = getCallTimeStatus(appointmentDetails?.timeSlot, appointmentDetails?.appointmentDate)
         if (!status.allowed) {
             if (status.reason === 'early') {
                 toast.error(`Too early! You can join in ${status.minutesUntilStart} minutes.`)
@@ -201,6 +192,7 @@ export default function PatientVideoCall() {
                 patientInfo={callData.appointment?.patientInfo}
                 doctorInfo={callData.appointment?.doctorInfo}
                 timeSlot={appointmentDetails?.timeSlot}  // ← pass timeSlot
+                appointmentDate={appointmentDetails?.appointmentDate} 
                 onCallEnd={handleCallEnd}
             />
         )
