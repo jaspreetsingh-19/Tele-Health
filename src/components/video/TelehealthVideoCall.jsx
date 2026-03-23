@@ -21,7 +21,7 @@ import {
 import { toast } from 'sonner';
 import { io } from 'socket.io-client';
 
-const server_url = "http://localhost:3000";
+const server_url = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000";
 
 const rtcConfiguration = {
     iceServers: [
