@@ -8,15 +8,12 @@ import {
     MessageSquare,
     X,
     Send,
-    Settings,
     AlertCircle,
     Wifi,
     WifiOff,
-    User,
-    Stethoscope,
-    Menu,
     Minimize2,
-    Maximize2
+    Maximize2,
+    Clock
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { io } from 'socket.io-client';
@@ -31,6 +28,62 @@ const rtcConfiguration = {
     ],
 };
 
+// ─── Time window check ───────────────────────────────────────────────────────
+// Returns { allowed: bool, minutesUntilStart: number, minutesPastEnd: number }
+function getCallTimeStatus(timeSlot) {
+    if (!timeSlot) return { allowed: true };
+
+    try {
+        // timeSlot expected: { date: "2024-01-15", startTime: "12:30", endTime: "13:00" }
+        // OR startTime could be a full ISO string
+        const now = new Date();
+
+        let start, end;
+
+        if (timeSlot.startTime && timeSlot.date) {
+            const dateStr = typeof timeSlot.date === 'string'
+                ? timeSlot.date.split('T')[0]
+                : new Date(timeSlot.date).toISOString().split('T')[0];
+
+            start = new Date(`${dateStr}T${timeSlot.startTime}:00`);
+            // end = start + 30 min if no endTime
+            if (timeSlot.endTime) {
+                end = new Date(`${dateStr}T${timeSlot.endTime}:00`);
+            } else {
+                end = new Date(start.getTime() + 30 * 60 * 1000);
+            }
+        } else if (timeSlot.startTime) {
+            // Maybe it's already a full date string
+            start = new Date(timeSlot.startTime);
+            end = timeSlot.endTime
+                ? new Date(timeSlot.endTime)
+                : new Date(start.getTime() + 30 * 60 * 1000);
+        } else {
+            return { allowed: true };
+        }
+
+        // Allow joining 5 min early
+        const windowStart = new Date(start.getTime() - 5 * 60 * 1000);
+        // Block 30 min after scheduled end
+        const windowEnd = new Date(end.getTime() + 30 * 60 * 1000);
+
+        if (now < windowStart) {
+            const minutesUntil = Math.ceil((windowStart - now) / 60000);
+            return { allowed: false, reason: 'early', minutesUntilStart: minutesUntil, startTime: start };
+        }
+
+        if (now > windowEnd) {
+            const minutesPast = Math.floor((now - windowEnd) / 60000);
+            return { allowed: false, reason: 'expired', minutesPastEnd: minutesPast, endTime: end };
+        }
+
+        return { allowed: true };
+    } catch (e) {
+        console.error('Error parsing timeSlot:', e);
+        return { allowed: true }; // fail open
+    }
+}
+
 export default function TelehealthVideoCall({
     callId,
     userId,
@@ -39,6 +92,7 @@ export default function TelehealthVideoCall({
     userType,
     patientInfo,
     doctorInfo,
+    timeSlot,           // pass this from parent
     onCallEnd = () => console.log("Call ended")
 }) {
     const socketRef = useRef(null);
@@ -62,9 +116,25 @@ export default function TelehealthVideoCall({
     const [connectionQuality, setConnectionQuality] = useState('good');
     const [isTyping, setIsTyping] = useState(false);
     const [isLocalVideoMinimized, setIsLocalVideoMinimized] = useState(false);
-    const [showMobileControls, setShowMobileControls] = useState(false);
+    const [timeStatus, setTimeStatus] = useState(() => getCallTimeStatus(timeSlot));
 
     const otherUser = userType === 'patient' ? doctorInfo : patientInfo;
+
+    // Re-check time every 30s
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setTimeStatus(getCallTimeStatus(timeSlot));
+        }, 30000);
+        return () => clearInterval(interval);
+    }, [timeSlot]);
+
+    // Block if time expired while in call
+    useEffect(() => {
+        if (!timeStatus.allowed && timeStatus.reason === 'expired' && callStatus === 'connected') {
+            toast.error('Appointment time has ended. Call will be disconnected.');
+            setTimeout(() => endCall(), 3000);
+        }
+    }, [timeStatus]);
 
     // Initialize call
     useEffect(() => {
@@ -88,28 +158,16 @@ export default function TelehealthVideoCall({
             console.log('[INIT] Starting telehealth call initialization');
             toast.loading('Initializing video call...', { id: 'init-call' });
 
-            // Get user media
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 },
-                    facingMode: 'user'
-                },
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true
-                },
+                video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+                audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
             });
 
             localStreamRef.current = stream;
-            if (localVideoRef.current) {
-                localVideoRef.current.srcObject = stream;
-            }
+            if (localVideoRef.current) localVideoRef.current.srcObject = stream;
 
             toast.success('Camera and microphone ready', { id: 'init-call' });
 
-            // Initialize Socket.IO connection
             const socket = io(server_url, {
                 transports: ['websocket', 'polling'],
                 reconnection: true,
@@ -120,32 +178,23 @@ export default function TelehealthVideoCall({
             socketRef.current = socket;
             setupSocketListeners(socket);
 
-            // Wait for socket connection
             socket.on('connect', () => {
                 console.log('[SOCKET] Connected to server, socket ID:', socket.id);
                 toast.success('Connected to call server');
                 setIsConnected(true);
-
-                // Join the video call room
-                socket.emit('join-video-call', {
-                    callId,
-                    userId,
-                    username
-                });
+                socket.emit('join-video-call', { callId, userId, username });
             });
 
             socket.on('connect_error', (error) => {
                 console.error('[SOCKET] Connection error:', error);
-                toast.error('Failed to connect to call server. Is the server running?');
+                toast.error('Failed to connect to call server.');
                 setCallStatus('failed');
             });
 
             socket.on('disconnect', (reason) => {
-                console.log('[SOCKET] Disconnected from server:', reason);
+                console.log('[SOCKET] Disconnected:', reason);
                 setIsConnected(false);
-                if (reason === 'io server disconnect') {
-                    socket.connect();
-                }
+                if (reason === 'io server disconnect') socket.connect();
             });
 
         } catch (error) {
@@ -156,146 +205,79 @@ export default function TelehealthVideoCall({
     };
 
     const setupSocketListeners = (socket) => {
-        // Handle successful join
         socket.on('video-call-joined', ({ callId: joinedCallId, callStatus: status, participantCount, otherParticipants, messages: historyMessages }) => {
-            console.log('[SOCKET] Video call joined:', { joinedCallId, status, participantCount, otherParticipants });
             setCallStatus(status === 'connected' ? 'connected' : 'ringing');
-
-            // Load message history
-            if (historyMessages && historyMessages.length > 0) {
-                const formattedMessages = historyMessages.map(msg => ({
+            if (historyMessages?.length > 0) {
+                setMessages(historyMessages.map(msg => ({
                     id: msg.messageId || msg.timestamp?.toString() || Date.now().toString(),
-                    content: msg.content,
-                    sender: msg.sender,
-                    senderId: msg.senderId,
+                    content: msg.content, sender: msg.sender, senderId: msg.senderId,
                     senderRole: msg.senderRole,
                     timestamp: new Date(msg.timestamp || Date.now()).toLocaleTimeString(),
                     isOwn: msg.senderId === userId,
-                }));
-                setMessages(formattedMessages);
+                })));
             }
-
-            // If there are other participants, prepare for WebRTC
-            if (otherParticipants && otherParticipants.length > 0) {
-                targetUserIdRef.current = otherParticipants[0].userId;
-            }
+            if (otherParticipants?.length > 0) targetUserIdRef.current = otherParticipants[0].userId;
         });
 
-        // Handle other user joining
-        socket.on('user-joined-video', ({ userId: joinedUserId, username: joinedUsername, callStatus: status, participantCount }) => {
-            console.log('[SOCKET] User joined video:', joinedUsername, joinedUserId);
+        socket.on('user-joined-video', ({ userId: joinedUserId, username: joinedUsername, callStatus: status }) => {
             toast.success(`${joinedUsername} joined the call`);
             setCallStatus(status === 'connected' ? 'connected' : 'ringing');
-
             targetUserIdRef.current = joinedUserId;
         });
 
-        // Handle WebRTC initiation signal
         socket.on('initiate-webrtc', ({ targetUserId, targetUsername, role }) => {
-            console.log('[SOCKET] Initiate WebRTC as', role, 'to', targetUsername);
             targetUserIdRef.current = targetUserId;
             isInitiatorRef.current = (role === 'caller');
-
-            if (isInitiatorRef.current) {
-                console.log('[RTC] Acting as caller, making offer');
-                setTimeout(() => makeOffer(targetUserId), 500);
-            }
+            if (isInitiatorRef.current) setTimeout(() => makeOffer(targetUserId), 500);
         });
 
-        socket.on('webrtc-ready', ({ targetUserId, targetUsername, role }) => {
-            console.log('[SOCKET] WebRTC ready as', role, 'with', targetUsername);
+        socket.on('webrtc-ready', ({ targetUserId, role }) => {
             targetUserIdRef.current = targetUserId;
             isInitiatorRef.current = (role === 'caller');
         });
 
-        // Handle WebRTC offer
-        socket.on('webrtc-offer', async ({ offer, fromUserId, fromUsername }) => {
-            console.log('[SOCKET] Received offer from:', fromUsername, fromUserId);
-            await handleOffer(offer, fromUserId);
-        });
+        socket.on('webrtc-offer', async ({ offer, fromUserId }) => { await handleOffer(offer, fromUserId); });
+        socket.on('webrtc-answer', async ({ answer }) => { await handleAnswer(answer); });
+        socket.on('webrtc-ice-candidate', async ({ candidate }) => { await handleRemoteIceCandidate(candidate); });
 
-        // Handle WebRTC answer
-        socket.on('webrtc-answer', async ({ answer, fromUserId, fromUsername }) => {
-            console.log('[SOCKET] Received answer from:', fromUsername, fromUserId);
-            await handleAnswer(answer);
-        });
-
-        // Handle ICE candidates
-        socket.on('webrtc-ice-candidate', async ({ candidate, fromUserId }) => {
-            console.log('[SOCKET] Received ICE candidate from:', fromUserId);
-            await handleRemoteIceCandidate(candidate);
-        });
-
-        // Handle user left
-        socket.on('user-left-video', ({ userId: leftUserId, username: leftUsername, participantCount }) => {
-            console.log('[SOCKET] User left video:', leftUsername);
+        socket.on('user-left-video', ({ username: leftUsername, participantCount }) => {
             toast.info(`${leftUsername} left the call`);
-            if (participantCount === 0) {
-                setCallStatus('ended');
-            } else {
-                setCallStatus('ringing');
-            }
+            setCallStatus(participantCount === 0 ? 'ended' : 'ringing');
         });
 
-        // Handle chat messages
         socket.on('receiveVideoMessage', (messageData) => {
-            console.log('[SOCKET] Received video message:', messageData);
             if (messageData.senderId !== userId) {
-                const message = {
-                    id: messageData.messageId || messageData.timestamp?.toString() || Date.now().toString(),
-                    content: messageData.content,
-                    sender: messageData.sender,
-                    senderId: messageData.senderId,
-                    senderRole: messageData.senderRole,
+                setMessages(prev => [...prev, {
+                    id: messageData.messageId || Date.now().toString(),
+                    content: messageData.content, sender: messageData.sender,
+                    senderId: messageData.senderId, senderRole: messageData.senderRole,
                     timestamp: new Date(messageData.timestamp || Date.now()).toLocaleTimeString(),
                     isOwn: false,
-                };
-                setMessages(prev => [...prev, message]);
+                }]);
                 toast.success('New message received');
             }
         });
 
-        // Handle message sent confirmation
-        socket.on('videoMessageSent', ({ messageId, timestamp }) => {
-            console.log('[SOCKET] Video message sent confirmation:', messageId);
+        socket.on('videoTyping', ({ userId: typingUserId, isTyping: typing }) => {
+            if (typingUserId !== userId) setIsTyping(typing);
         });
 
-        // Handle typing indicator
-        socket.on('videoTyping', ({ userId: typingUserId, username: typingUsername, isTyping: typing }) => {
-            if (typingUserId !== userId) {
-                setIsTyping(typing);
-            }
-        });
-
-        // Handle errors
         socket.on('video-error', ({ message }) => {
-            console.error('[SOCKET] Video error:', message);
             toast.error(message);
             setCallStatus('failed');
         });
 
-        socket.on('videoMessageError', ({ error }) => {
-            console.error('[SOCKET] Video message error:', error);
-            toast.error('Failed to send message');
-        });
+        socket.on('videoMessageError', () => toast.error('Failed to send message'));
     };
 
     const makeOffer = async (targetUserId) => {
         const pc = createPeerConnection();
         targetUserIdRef.current = targetUserId;
         makingOfferRef.current = true;
-
         try {
-            console.log('[RTC] Creating offer');
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
-
-            console.log('[RTC] Sending offer to:', targetUserId);
-            socketRef.current?.emit('webrtc-offer', {
-                callId,
-                offer,
-                targetUserId,
-            });
+            socketRef.current?.emit('webrtc-offer', { callId, offer, targetUserId });
         } catch (error) {
             console.error('[RTC] Error making offer:', error);
             toast.error('Failed to establish connection');
@@ -306,22 +288,12 @@ export default function TelehealthVideoCall({
 
     const createPeerConnection = () => {
         if (pcRef.current) return pcRef.current;
-
-        console.log('[RTC] Creating peer connection');
         const pc = new RTCPeerConnection(rtcConfiguration);
         pcRef.current = pc;
 
-        // Add local stream tracks
-        if (localStreamRef.current) {
-            localStreamRef.current.getTracks().forEach(track => {
-                console.log('[RTC] Adding track:', track.kind);
-                pc.addTrack(track, localStreamRef.current);
-            });
-        }
+        localStreamRef.current?.getTracks().forEach(track => pc.addTrack(track, localStreamRef.current));
 
-        // Handle remote stream
         pc.ontrack = (event) => {
-            console.log('[RTC] Received remote track:', event.track.kind);
             const [remoteStream] = event.streams;
             if (remoteVideoRef.current && remoteStream) {
                 remoteVideoRef.current.srcObject = remoteStream;
@@ -330,43 +302,21 @@ export default function TelehealthVideoCall({
             }
         };
 
-        // Handle ICE candidates
         pc.onicecandidate = (event) => {
             if (event.candidate && targetUserIdRef.current && socketRef.current) {
-                console.log('[RTC] Sending ICE candidate');
                 socketRef.current.emit('webrtc-ice-candidate', {
-                    callId,
-                    candidate: event.candidate.toJSON(),
-                    targetUserId: targetUserIdRef.current,
+                    callId, candidate: event.candidate.toJSON(), targetUserId: targetUserIdRef.current,
                 });
             }
         };
 
-        // Monitor connection quality
         pc.oniceconnectionstatechange = () => {
-            console.log('[RTC] ICE connection state:', pc.iceConnectionState);
             switch (pc.iceConnectionState) {
-                case 'connected':
-                case 'completed':
-                    setConnectionQuality('good');
-                    setCallStatus('connected');
-                    toast.success('Connection quality: Good');
-                    break;
-                case 'disconnected':
-                    setConnectionQuality('fair');
-                    toast.warning('Connection quality: Fair');
-                    break;
-                case 'failed':
-                    setConnectionQuality('poor');
-                    toast.error('Connection quality: Poor');
-                    break;
-                default:
-                    break;
+                case 'connected': case 'completed':
+                    setConnectionQuality('good'); setCallStatus('connected'); break;
+                case 'disconnected': setConnectionQuality('fair'); break;
+                case 'failed': setConnectionQuality('poor'); break;
             }
-        };
-
-        pc.onsignalingstatechange = () => {
-            console.log('[RTC] Signaling state:', pc.signalingState);
         };
 
         return pc;
@@ -375,670 +325,360 @@ export default function TelehealthVideoCall({
     const handleOffer = async (offer, fromUserId) => {
         const pc = createPeerConnection();
         targetUserIdRef.current = fromUserId;
-
         try {
-            console.log('[RTC] Handling offer, current signaling state:', pc.signalingState);
-
             if (pc.signalingState === 'have-local-offer') {
-                if (userId > fromUserId) {
-                    console.log('[RTC] Ignoring offer due to glare (we win)');
-                    return;
-                } else {
-                    console.log('[RTC] Rolling back due to glare');
-                    await pc.setLocalDescription({ type: 'rollback' });
-                }
+                if (userId > fromUserId) return;
+                await pc.setLocalDescription({ type: 'rollback' });
             }
-
             await pc.setRemoteDescription(new RTCSessionDescription(offer));
-            console.log('[RTC] Remote description set, creating answer');
-
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
-            console.log('[RTC] Sending answer');
-
-            socketRef.current?.emit('webrtc-answer', {
-                callId,
-                answer,
-                targetUserId: fromUserId,
-            });
-
+            socketRef.current?.emit('webrtc-answer', { callId, answer, targetUserId: fromUserId });
             await flushPendingCandidates();
         } catch (error) {
             console.error('[RTC] Error handling offer:', error);
-            toast.error('Failed to establish video connection');
         }
     };
 
     const handleAnswer = async (answer) => {
         const pc = pcRef.current;
-        if (!pc) {
-            console.warn('[RTC] No peer connection to handle answer');
-            return;
-        }
-
+        if (!pc) return;
         try {
-            console.log('[RTC] Handling answer, current signaling state:', pc.signalingState);
-
             if (pc.signalingState === 'have-local-offer') {
                 await pc.setRemoteDescription(new RTCSessionDescription(answer));
                 await flushPendingCandidates();
-                console.log('[RTC] Answer applied successfully');
-            } else {
-                console.warn('[RTC] Cannot set answer, signaling state is:', pc.signalingState);
             }
         } catch (error) {
             console.error('[RTC] Error handling answer:', error);
-            toast.error('Connection error occurred');
         }
     };
 
     const handleRemoteIceCandidate = async (candidate) => {
         const pc = pcRef.current;
-
         if (!pc || !pc.remoteDescription) {
-            console.log('[RTC] Queueing ICE candidate (no remote description yet)');
             pendingCandidatesRef.current.push(new RTCIceCandidate(candidate));
             return;
         }
-
-        try {
-            await pc.addIceCandidate(new RTCIceCandidate(candidate));
-            console.log('[RTC] ICE candidate added');
-        } catch (error) {
-            console.error('[RTC] Error adding ICE candidate:', error);
-        }
+        try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); }
+        catch (error) { console.error('[RTC] Error adding ICE candidate:', error); }
     };
 
     const flushPendingCandidates = async () => {
         const pc = pcRef.current;
         if (!pc || !pc.remoteDescription) return;
-
         const candidates = pendingCandidatesRef.current.splice(0);
-        console.log('[RTC] Flushing', candidates.length, 'pending ICE candidates');
-
         for (const candidate of candidates) {
-            try {
-                await pc.addIceCandidate(candidate);
-            } catch (error) {
-                console.error('[RTC] Error adding pending ICE candidate:', error);
-            }
+            try { await pc.addIceCandidate(candidate); } catch (e) { }
         }
     };
 
     const toggleVideo = () => {
-        const videoTrack = localStreamRef.current?.getVideoTracks()[0];
-        if (videoTrack) {
-            videoTrack.enabled = !videoTrack.enabled;
-            setVideo(videoTrack.enabled);
-            toast.success(videoTrack.enabled ? 'Camera turned on' : 'Camera turned off');
-        }
+        const track = localStreamRef.current?.getVideoTracks()[0];
+        if (track) { track.enabled = !track.enabled; setVideo(track.enabled); }
     };
 
     const toggleAudio = () => {
-        const audioTrack = localStreamRef.current?.getAudioTracks()[0];
-        if (audioTrack) {
-            audioTrack.enabled = !audioTrack.enabled;
-            setAudio(audioTrack.enabled);
-            toast.success(audioTrack.enabled ? 'Microphone turned on' : 'Microphone turned off');
-        }
+        const track = localStreamRef.current?.getAudioTracks()[0];
+        if (track) { track.enabled = !track.enabled; setAudio(track.enabled); }
     };
 
     const endCall = () => {
-        if (socketRef.current) {
-            socketRef.current.emit('leave-video-call', { callId });
-        }
+        socketRef.current?.emit('leave-video-call', { callId });
         cleanup();
         toast.success('Call ended');
         onCallEnd?.();
     };
 
     const cleanup = () => {
-        console.log('[CLEANUP] Cleaning up call resources');
-
-        // Stop local tracks
-        localStreamRef.current?.getTracks().forEach(track => {
-            track.stop();
-            console.log('[CLEANUP] Stopped track:', track.kind);
-        });
+        localStreamRef.current?.getTracks().forEach(t => t.stop());
         localStreamRef.current = null;
-
-        // Close peer connection
-        if (pcRef.current) {
-            pcRef.current.close();
-            pcRef.current = null;
-            console.log('[CLEANUP] Closed peer connection');
-        }
-
-        // Clean up refs
+        if (pcRef.current) { pcRef.current.close(); pcRef.current = null; }
         pendingCandidatesRef.current = [];
         targetUserIdRef.current = null;
         isInitiatorRef.current = false;
-
-        // Disconnect socket
-        if (socketRef.current) {
-            socketRef.current.disconnect();
-            socketRef.current = null;
-            console.log('[CLEANUP] Disconnected socket');
-        }
-
+        if (socketRef.current) { socketRef.current.disconnect(); socketRef.current = null; }
         setCallStatus('ended');
         setIsConnected(false);
     };
 
     const sendMessage = () => {
         if (!newMessage.trim() || !socketRef.current) return;
-
-        const messageData = {
-            callId,
-            senderId: userId,
-            sender: username,
-            senderRole: userType,
-            content: newMessage,
-            type: 'text',
-            timestamp: Date.now(),
-        };
-
-        // Add to local messages
         const message = {
-            id: Date.now().toString(),
-            content: newMessage,
-            sender: username,
-            senderId: userId,
-            senderRole: userType,
-            timestamp: new Date().toLocaleTimeString(),
-            isOwn: true,
+            id: Date.now().toString(), content: newMessage, sender: username,
+            senderId: userId, senderRole: userType,
+            timestamp: new Date().toLocaleTimeString(), isOwn: true,
         };
-
         setMessages(prev => [...prev, message]);
-        socketRef.current.emit('sendVideoMessage', messageData);
+        socketRef.current.emit('sendVideoMessage', {
+            callId, senderId: userId, sender: username, senderRole: userType,
+            content: newMessage, type: 'text', timestamp: Date.now(),
+        });
         setNewMessage('');
     };
 
     const handleTyping = (typing) => {
-        if (socketRef.current) {
-            socketRef.current.emit('videoTyping', {
-                callId,
-                userId,
-                isTyping: typing,
-            });
-        }
+        socketRef.current?.emit('videoTyping', { callId, userId, isTyping: typing });
     };
 
     const formatDuration = (seconds) => {
-        const minutes = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+        const s = (seconds % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
     };
 
-    const getConnectionStatusIcon = () => {
-        if (!isConnected) return <WifiOff className="w-4 h-4 text-red-500" />;
-        return <Wifi className="w-4 h-4 text-green-500" />;
-    };
-
-    const getStatusColor = () => {
-        switch (callStatus) {
-            case 'connected': return 'text-green-600';
-            case 'ringing': return 'text-yellow-600';
-            case 'connecting': return 'text-blue-600';
-            case 'failed': return 'text-red-600';
-            case 'ended': return 'text-gray-600';
-            default: return 'text-gray-600';
-        }
-    };
-
-    return (
-        <div className="h-screen bg-gradient-to-br from-blue-50 to-white flex flex-col overflow-hidden">
-            {/* Header */}
-            <div className="bg-white border-b border-gray-200 p-3 md:p-4 shadow-sm flex-shrink-0">
-                <div className="flex justify-between items-center">
-                    <div className="flex items-center space-x-2 md:space-x-4 min-w-0 flex-1">
-                        <div className="relative flex-shrink-0">
-                            <div className="w-8 h-8 md:w-12 md:h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm md:text-lg shadow-md">
-                                {otherUser.username.charAt(0).toUpperCase()}
-                            </div>
-                            <div className={`absolute -bottom-1 -right-1 w-3 h-3 md:w-4 md:h-4 rounded-full border-2 border-white ${callStatus === 'connected' ? 'bg-green-500' : 'bg-gray-400'
-                                }`} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <h2 className="font-semibold text-gray-900 text-sm md:text-lg truncate">
-                                {userType === 'patient' ? `Dr. ${otherUser.username}` : `Patient: ${otherUser.username}`}
-                            </h2>
-                            <p className={`text-xs md:text-sm font-medium ${getStatusColor()}`}>
-                                {callStatus === 'connected'
-                                    ? `Connected • ${formatDuration(callDuration)}`
-                                    : callStatus.charAt(0).toUpperCase() + callStatus.slice(1)
-                                }
+    // ─── Time blocked screen ──────────────────────────────────────────────────
+    if (!timeStatus.allowed) {
+        return (
+            <div className="h-screen bg-gray-950 flex items-center justify-center p-4">
+                <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center max-w-sm w-full shadow-2xl">
+                    <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Clock className="w-8 h-8 text-gray-400" />
+                    </div>
+                    {timeStatus.reason === 'early' ? (
+                        <>
+                            <h2 className="text-white text-xl font-semibold mb-2">Too Early</h2>
+                            <p className="text-gray-400 text-sm mb-4">
+                                Your appointment starts in <span className="text-white font-medium">{timeStatus.minutesUntilStart} min</span>
                             </p>
-                        </div>
-                    </div>
+                            <p className="text-gray-500 text-xs">
+                                You can join 5 minutes before your scheduled time.
+                            </p>
+                        </>
+                    ) : (
+                        <>
+                            <h2 className="text-white text-xl font-semibold mb-2">Appointment Expired</h2>
+                            <p className="text-gray-400 text-sm mb-4">
+                                This appointment ended <span className="text-white font-medium">{timeStatus.minutesPastEnd} min ago</span>
+                            </p>
+                            <p className="text-gray-500 text-xs">
+                                Video calls are only available during the scheduled appointment window.
+                            </p>
+                        </>
+                    )}
+                    <button
+                        onClick={() => onCallEnd?.()}
+                        className="mt-6 w-full py-2.5 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-sm transition-colors"
+                    >
+                        Go Back
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
-                    <div className="flex items-center space-x-2 md:space-x-3 flex-shrink-0">
-                        <div className="hidden sm:flex items-center space-x-2 text-xs md:text-sm text-gray-600">
-                            {getConnectionStatusIcon()}
-                            <span className="capitalize">{connectionQuality}</span>
+    // ─── Main call UI ─────────────────────────────────────────────────────────
+    return (
+        <div className="h-screen bg-gray-950 flex flex-col overflow-hidden">
+
+            {/* ── Compact Header ── */}
+            <div className="flex items-center justify-between px-3 py-2 bg-gray-900/90 backdrop-blur-sm border-b border-gray-800 flex-shrink-0">
+                {/* Left: avatar + name + status */}
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="relative flex-shrink-0">
+                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                            {otherUser?.username?.charAt(0).toUpperCase()}
                         </div>
-                        <button
-                            className="p-1.5 md:p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                            onClick={() => setShowMobileControls(!showMobileControls)}
-                        >
-                            <Menu className="w-4 h-4 md:w-5 md:h-5 text-gray-600 md:hidden" />
-                            <Settings className="w-5 h-5 text-gray-600 hidden md:block" />
-                        </button>
+                        <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-gray-900 ${callStatus === 'connected' ? 'bg-green-400' : 'bg-gray-500'}`} />
                     </div>
+                    <div className="min-w-0">
+                        <p className="text-white text-sm font-medium truncate leading-tight">
+                            {userType === 'patient' ? `Dr. ${otherUser?.username}` : otherUser?.username}
+                        </p>
+                        <p className={`text-xs leading-tight ${callStatus === 'connected' ? 'text-green-400' : callStatus === 'ringing' ? 'text-yellow-400' : 'text-gray-400'}`}>
+                            {callStatus === 'connected' ? `${formatDuration(callDuration)}` : callStatus.charAt(0).toUpperCase() + callStatus.slice(1)}
+                        </p>
+                    </div>
+                </div>
+
+                {/* Right: connection + chat toggle */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                    {isConnected
+                        ? <Wifi className="w-3.5 h-3.5 text-green-400" />
+                        : <WifiOff className="w-3.5 h-3.5 text-red-400" />
+                    }
+                    <button
+                        onClick={() => setShowChat(!showChat)}
+                        className={`relative p-1.5 rounded-lg transition-colors ${showChat ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                    >
+                        <MessageSquare className="w-4 h-4" />
+                        {messages.some(m => !m.isOwn) && (
+                            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full" />
+                        )}
+                    </button>
                 </div>
             </div>
 
-            {/* Mobile Status Bar */}
-            {showMobileControls && (
-                <div className="bg-gray-50 p-2 border-b border-gray-200 md:hidden">
-                    <div className="flex items-center justify-center space-x-4 text-xs text-gray-600">
-                        {getConnectionStatusIcon()}
-                        <span className="capitalize">{connectionQuality} connection</span>
-                    </div>
-                </div>
-            )}
-
-            {/* Video Area */}
-            <div className="flex-1 relative bg-gray-900 overflow-hidden">
-                {/* Remote Video */}
+            {/* ── Video Area (fills remaining space) ── */}
+            <div className="flex-1 relative overflow-hidden">
+                {/* Remote video */}
                 <video
                     ref={remoteVideoRef}
                     autoPlay
                     playsInline
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover bg-gray-900"
                 />
 
-                {/* Local Video (Picture-in-Picture) */}
-                <div className={`absolute transition-all duration-300 ${isLocalVideoMinimized
-                    ? 'top-4 right-4 w-20 h-16 md:w-24 md:h-18'
-                    : 'top-4 right-4 w-32 h-24 md:w-64 md:h-48'
-                    } bg-gray-800 border-2 border-white rounded-lg md:rounded-xl overflow-hidden shadow-xl z-10`}>
-                    <video
-                        ref={localVideoRef}
-                        autoPlay
-                        muted
-                        playsInline
-                        className="w-full h-full object-cover"
-                    />
-                    <div className="absolute bottom-1 left-1 md:bottom-2 md:left-2 bg-black bg-opacity-75 text-white text-xs px-1 py-0.5 md:px-2 md:py-1 rounded">
-                        {isLocalVideoMinimized ? 'You' : `You (${username})`}
-                    </div>
+                {/* Self video — small PiP */}
+                <div className={`absolute bottom-16 right-3 transition-all duration-300 rounded-xl overflow-hidden shadow-2xl border border-white/20 z-10 ${isLocalVideoMinimized ? 'w-16 h-12' : 'w-28 h-20 md:w-36 md:h-28'}`}>
+                    <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-gray-800" />
                     {!video && (
                         <div className="absolute inset-0 bg-gray-800 flex items-center justify-center">
-                            <VideoOff className="w-4 h-4 md:w-8 md:h-8 text-gray-400" />
+                            <VideoOff className="w-4 h-4 text-gray-500" />
                         </div>
                     )}
                     <button
                         onClick={() => setIsLocalVideoMinimized(!isLocalVideoMinimized)}
-                        className="absolute top-1 right-1 md:top-2 md:right-2 bg-black bg-opacity-75 text-white p-1 rounded hover:bg-opacity-100 transition-colors"
+                        className="absolute top-1 right-1 bg-black/60 text-white p-0.5 rounded"
                     >
-                        {isLocalVideoMinimized ? (
-                            <Maximize2 className="w-3 h-3 md:w-4 md:h-4" />
-                        ) : (
-                            <Minimize2 className="w-3 h-3 md:w-4 md:h-4" />
-                        )}
+                        {isLocalVideoMinimized ? <Maximize2 className="w-2.5 h-2.5" /> : <Minimize2 className="w-2.5 h-2.5" />}
                     </button>
+                    {!isLocalVideoMinimized && (
+                        <div className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1 rounded">You</div>
+                    )}
                 </div>
 
-                {/* Call Status Overlay */}
+                {/* Status overlay (connecting / ringing / failed) */}
                 {callStatus !== 'connected' && (
-                    <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-2xl p-6 md:p-8 text-center shadow-2xl max-w-sm mx-auto">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-20">
+                        <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 text-center max-w-xs w-full">
                             {callStatus === 'connecting' && (
-                                <div className="space-y-4">
-                                    <div className="animate-pulse w-12 h-12 md:w-16 md:h-16 bg-blue-500 rounded-full mx-auto flex items-center justify-center">
-                                        <Video className="w-6 h-6 md:w-8 md:h-8 text-white" />
+                                <>
+                                    <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-3 animate-pulse">
+                                        <Video className="w-6 h-6 text-blue-400" />
                                     </div>
-                                    <h3 className="text-lg md:text-xl font-semibold text-gray-900">Connecting...</h3>
-                                    <p className="text-sm md:text-base text-gray-600">Setting up your video call</p>
-                                </div>
+                                    <p className="text-white font-medium">Connecting...</p>
+                                    <p className="text-gray-400 text-sm mt-1">Setting up your call</p>
+                                </>
                             )}
                             {callStatus === 'ringing' && (
-                                <div className="space-y-4">
-                                    <div className="animate-bounce w-12 h-12 md:w-16 md:h-16 bg-green-500 rounded-full mx-auto flex items-center justify-center">
-                                        <Video className="w-6 h-6 md:w-8 md:h-8 text-white" />
+                                <>
+                                    <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3 animate-bounce">
+                                        <Video className="w-6 h-6 text-green-400" />
                                     </div>
-                                    <h3 className="text-lg md:text-xl font-semibold text-gray-900">
-                                        {userType === 'doctor' ? 'Waiting for Patient...' : 'Waiting for Doctor...'}
-                                    </h3>
-                                    <p className="text-sm md:text-base text-gray-600">Waiting for {otherUser.username} to join</p>
-                                </div>
+                                    <p className="text-white font-medium">
+                                        {userType === 'doctor' ? 'Waiting for patient...' : 'Waiting for doctor...'}
+                                    </p>
+                                    <p className="text-gray-400 text-sm mt-1">{otherUser?.username} hasn't joined yet</p>
+                                </>
                             )}
                             {callStatus === 'failed' && (
-                                <div className="space-y-4">
-                                    <AlertCircle className="w-12 h-12 md:w-16 md:h-16 text-red-500 mx-auto" />
-                                    <h3 className="text-lg md:text-xl font-semibold text-gray-900">Connection Failed</h3>
-                                    <p className="text-sm md:text-base text-gray-600">
-                                        {!isConnected ? 'Could not connect to server. Please check if the server is running.' : 'Please check your connection and try again'}
+                                <>
+                                    <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
+                                    <p className="text-white font-medium">Connection Failed</p>
+                                    <p className="text-gray-400 text-sm mt-1 mb-4">
+                                        {!isConnected ? 'Could not reach server' : 'Check your connection'}
                                     </p>
-                                    <button
-                                        onClick={endCall}
-                                        className="px-4 py-2 md:px-6 md:py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm md:text-base"
-                                    >
+                                    <button onClick={endCall} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition-colors w-full">
                                         Close
                                     </button>
-                                </div>
+                                </>
+                            )}
+                            {callStatus === 'ended' && (
+                                <>
+                                    <div className="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <PhoneOff className="w-6 h-6 text-gray-400" />
+                                    </div>
+                                    <p className="text-white font-medium">Call Ended</p>
+                                </>
                             )}
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* Controls */}
-            <div className="bg-white border-t border-gray-200 p-4 md:p-6 flex-shrink-0">
-                <div className="flex justify-center items-center space-x-4 md:space-x-6">
-                    <button
-                        onClick={toggleVideo}
-                        className={`p-3 md:p-4 rounded-full transition-all duration-200 transform hover:scale-105 ${video
-                            ? 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                            : 'bg-red-500 hover:bg-red-600 text-white shadow-lg'
-                            }`}
-                    >
-                        {video ? <Video size={20} className="md:w-6 md:h-6" /> : <VideoOff size={20} className="md:w-6 md:h-6" />}
-                    </button>
+            {/* ── Compact Controls Bar ── */}
+            <div className="flex items-center justify-center gap-3 px-4 py-2.5 bg-gray-900/90 backdrop-blur-sm border-t border-gray-800 flex-shrink-0">
+                <button
+                    onClick={toggleVideo}
+                    className={`p-2.5 rounded-full transition-all ${video ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-red-600 hover:bg-red-700 text-white'}`}
+                >
+                    {video ? <Video size={18} /> : <VideoOff size={18} />}
+                </button>
 
-                    <button
-                        onClick={toggleAudio}
-                        className={`p-3 md:p-4 rounded-full transition-all duration-200 transform hover:scale-105 ${audio
-                            ? 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                            : 'bg-red-500 hover:bg-red-600 text-white shadow-lg'
-                            }`}
-                    >
-                        {audio ? <Mic size={20} className="md:w-6 md:h-6" /> : <MicOff size={20} className="md:w-6 md:h-6" />}
-                    </button>
+                <button
+                    onClick={toggleAudio}
+                    className={`p-2.5 rounded-full transition-all ${audio ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-red-600 hover:bg-red-700 text-white'}`}
+                >
+                    {audio ? <Mic size={18} /> : <MicOff size={18} />}
+                </button>
 
-                    <button
-                        onClick={() => setShowChat(!showChat)}
-                        className="p-3 md:p-4 rounded-full bg-blue-500 hover:bg-blue-600 text-white transition-all duration-200 transform hover:scale-105 shadow-lg relative"
-                    >
-                        <MessageSquare size={20} className="md:w-6 md:h-6" />
-                        {messages.some(m => !m.isOwn) && (
-                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-                        )}
-                    </button>
-
-                    <button
-                        onClick={endCall}
-                        className="p-3 md:p-4 rounded-full bg-red-500 hover:bg-red-600 text-white transition-all duration-200 transform hover:scale-105 shadow-lg"
-                    >
-                        <PhoneOff size={20} className="md:w-6 md:h-6" />
-                    </button>
-                </div>
+                <button
+                    onClick={endCall}
+                    className="p-2.5 px-5 rounded-full bg-red-600 hover:bg-red-700 text-white transition-all"
+                >
+                    <PhoneOff size={18} />
+                </button>
             </div>
 
-            {/* Chat Panel */}
+            {/* ── Chat Sidebar ── */}
             {showChat && (
-                <div className={`fixed ${typeof window !== 'undefined' && window.innerWidth < 768 ? 'inset-0' : 'right-0 top-0 h-full w-80 lg:w-96'} bg-white ${typeof window !== 'undefined' && window.innerWidth < 768 ? '' : 'border-l border-gray-200'} flex flex-col shadow-2xl z-50 transform transition-transform duration-300`}>
-                    <div className="p-3 md:p-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-white flex-shrink-0">
-                        <div className="flex justify-between items-center">
-                            <h3 className="font-semibold text-gray-900 text-lg">Chat</h3>
-                            <button
-                                onClick={() => setShowChat(false)}
-                                className="text-gray-500 hover:text-gray-700 p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                            >
-                                <X size={20} />
-                            </button>
-                        </div>
+                <div className="fixed right-0 top-0 h-full w-72 md:w-80 bg-gray-900 border-l border-gray-800 flex flex-col z-50 shadow-2xl">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800 flex-shrink-0">
+                        <h3 className="text-white font-medium text-sm">Chat</h3>
+                        <button onClick={() => setShowChat(false)} className="text-gray-400 hover:text-white p-1 rounded transition-colors">
+                            <X size={16} />
+                        </button>
                     </div>
 
-                    <div className="flex-1 p-3 md:p-4 overflow-y-auto space-y-3 scrollbar-thin scrollbar-thumb-gray-300">
+                    <div className="flex-1 p-3 overflow-y-auto space-y-2">
                         {messages.length === 0 ? (
-                            <div className="text-center text-gray-500 mt-8">
-                                <MessageSquare className="w-10 h-10 md:w-12 md:h-12 mx-auto text-gray-300 mb-3" />
-                                <p className="text-sm md:text-base">No messages yet</p>
-                                <p className="text-xs md:text-sm">Send a message to start the conversation</p>
+                            <div className="text-center text-gray-600 mt-12">
+                                <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                                <p className="text-xs">No messages yet</p>
                             </div>
                         ) : (
                             messages.map((message) => (
-                                <div key={message.id} className={`${message.isOwn ? 'text-right' : 'text-left'}`}>
-                                    <div className={`inline-block p-3 rounded-2xl max-w-xs break-words shadow-sm ${message.isOwn
-                                        ? 'bg-blue-500 text-white rounded-br-md'
-                                        : 'bg-gray-100 text-gray-900 rounded-bl-md'
-                                        }`}>
+                                <div key={message.id} className={`flex ${message.isOwn ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm ${message.isOwn ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-gray-800 text-gray-100 rounded-bl-sm'}`}>
                                         {!message.isOwn && (
-                                            <div className="text-xs font-medium mb-1 opacity-70">
+                                            <p className="text-xs text-gray-400 mb-0.5">
                                                 {message.senderRole === 'doctor' ? 'Dr. ' : ''}{message.sender}
-                                            </div>
+                                            </p>
                                         )}
-                                        <div className="text-sm leading-relaxed">{message.content}</div>
-                                        <div className={`text-xs mt-1 ${message.isOwn ? 'text-blue-100' : 'text-gray-500'
-                                            }`}>
+                                        <p className="leading-relaxed">{message.content}</p>
+                                        <p className={`text-xs mt-1 ${message.isOwn ? 'text-blue-200' : 'text-gray-500'}`}>
                                             {message.timestamp}
-                                        </div>
+                                        </p>
                                     </div>
                                 </div>
                             ))
                         )}
                         {isTyping && (
-                            <div className="text-left">
-                                <div className="inline-block p-3 bg-gray-100 rounded-2xl rounded-bl-md">
-                                    <div className="flex space-x-1">
-                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                            <div className="flex justify-start">
+                                <div className="bg-gray-800 px-3 py-2 rounded-2xl rounded-bl-sm">
+                                    <div className="flex gap-1 items-center h-4">
+                                        {[0, 150, 300].map(delay => (
+                                            <div key={delay} className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: `${delay}ms` }} />
+                                        ))}
                                     </div>
                                 </div>
                             </div>
                         )}
                     </div>
 
-                    <div className="p-3 md:p-4 border-t border-gray-200 bg-gray-50 flex-shrink-0">
-                        <div className="flex space-x-2 md:space-x-3">
+                    <div className="p-3 border-t border-gray-800 flex-shrink-0">
+                        <div className="flex gap-2">
                             <input
                                 type="text"
                                 value={newMessage}
                                 onChange={(e) => setNewMessage(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                        e.preventDefault();
-                                        sendMessage();
-                                        handleTyping(false);
-                                    }
-                                }}
+                                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); handleTyping(false); } }}
                                 onFocus={() => handleTyping(true)}
                                 onBlur={() => handleTyping(false)}
-                                placeholder="Type your message..."
-                                className="flex-1 p-2 md:p-3 border border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-sm md:text-base"
+                                placeholder="Message..."
+                                className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 text-white text-sm rounded-xl focus:outline-none focus:border-blue-500 placeholder-gray-500"
                             />
                             <button
                                 onClick={sendMessage}
                                 disabled={!newMessage.trim()}
-                                className="p-2 md:p-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 disabled:hover:scale-100 shadow-lg"
+                                className="p-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-xl transition-colors flex-shrink-0"
                             >
-                                <Send size={16} className="md:w-5 md:h-5" />
+                                <Send size={15} />
                             </button>
                         </div>
                     </div>
                 </div>
             )}
-        </div>
-    );
-}
-
-// Demo App Component
-export function TelehealthApp() {
-    const [inCall, setInCall] = useState(false);
-    const [userType, setUserType] = useState('patient');
-
-    // Mock data for demonstration
-    const callId = 'demo-call-123';
-    const patientInfo = {
-        id: 'patient-1',
-        username: 'John Smith',
-        type: 'patient',
-    };
-    const doctorInfo = {
-        id: 'doctor-1',
-        username: 'Sarah Johnson',
-        type: 'doctor',
-    };
-
-    const currentUser = userType === 'patient' ? patientInfo : doctorInfo;
-
-    const startCall = () => {
-        setInCall(true);
-        toast.success('Starting video consultation...');
-    };
-
-    const endCall = () => {
-        setInCall(false);
-        toast.info('Video consultation ended');
-    };
-
-    if (inCall) {
-        return (
-            <TelehealthVideoCall
-                callId={callId}
-                userId={currentUser.id}
-                roomId={callId}
-                username={currentUser.username}
-                userType={userType}
-                patientInfo={patientInfo}
-                doctorInfo={doctorInfo}
-                onCallEnd={endCall}
-            />
-        );
-    }
-
-    return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50">
-            <div className="container mx-auto px-4 py-8 md:py-12">
-                <div className="text-center mb-8 md:mb-12">
-                    <div className="w-16 h-16 md:w-24 md:h-24 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 shadow-xl">
-                        <Stethoscope className="w-8 h-8 md:w-12 md:h-12 text-white" />
-                    </div>
-                    <h1 className="text-2xl md:text-4xl font-bold text-gray-900 mb-3 md:mb-4 px-4">
-                        Telehealth Video Consultation
-                    </h1>
-                    <p className="text-base md:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed px-4">
-                        Connect with healthcare professionals through secure, high-quality video calls with integrated chat messaging.
-                    </p>
-                </div>
-
-                <div className="max-w-4xl mx-auto px-4">
-                    {/* Demo Controls */}
-                    <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 mb-6 md:mb-8">
-                        <h2 className="text-xl md:text-2xl font-semibold text-gray-900 mb-4 md:mb-6 flex items-center">
-                            <User className="w-5 h-5 md:w-6 md:h-6 mr-3 text-blue-500" />
-                            Demo Setup
-                        </h2>
-                        <div className="grid gap-4 md:gap-6 md:grid-cols-2">
-                            <button
-                                onClick={() => setUserType('patient')}
-                                className={`p-4 md:p-6 rounded-xl border-2 transition-all duration-200 text-left ${userType === 'patient'
-                                    ? 'border-blue-500 bg-blue-50 shadow-md transform scale-105'
-                                    : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
-                                    }`}
-                            >
-                                <div className="flex items-center mb-3">
-                                    <div className="w-10 h-10 md:w-12 md:h-12 bg-green-100 rounded-lg flex items-center justify-center mr-3 md:mr-4">
-                                        <User className="w-5 h-5 md:w-6 md:h-6 text-green-600" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-semibold text-gray-900 text-sm md:text-base">Join as Patient</h3>
-                                        <p className="text-xs md:text-sm text-gray-600">John Smith</p>
-                                    </div>
-                                </div>
-                                <p className="text-xs md:text-sm text-gray-600">
-                                    Experience the patient view of the telehealth consultation with video and chat features.
-                                </p>
-                            </button>
-
-                            <button
-                                onClick={() => setUserType('doctor')}
-                                className={`p-4 md:p-6 rounded-xl border-2 transition-all duration-200 text-left ${userType === 'doctor'
-                                    ? 'border-blue-500 bg-blue-50 shadow-md transform scale-105'
-                                    : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
-                                    }`}
-                            >
-                                <div className="flex items-center mb-3">
-                                    <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-3 md:mr-4">
-                                        <Stethoscope className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-semibold text-gray-900 text-sm md:text-base">Join as Doctor</h3>
-                                        <p className="text-xs md:text-sm text-gray-600">Dr. Sarah Johnson</p>
-                                    </div>
-                                </div>
-                                <p className="text-xs md:text-sm text-gray-600">
-                                    Experience the healthcare provider view with professional consultation tools.
-                                </p>
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Call Information */}
-                    <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 mb-6 md:mb-8">
-                        <h2 className="text-xl md:text-2xl font-semibold text-gray-900 mb-4 md:mb-6 flex items-center">
-                            <Video className="w-5 h-5 md:w-6 md:h-6 mr-3 text-blue-500" />
-                            Consultation Details
-                        </h2>
-                        <div className="grid gap-4 md:gap-6 md:grid-cols-2">
-                            <div className="space-y-3 md:space-y-4">
-                                <div>
-                                    <label className="text-xs md:text-sm font-medium text-gray-500">Patient</label>
-                                    <p className="text-base md:text-lg font-semibold text-gray-900">{patientInfo.username}</p>
-                                </div>
-                                <div>
-                                    <label className="text-xs md:text-sm font-medium text-gray-500">Healthcare Provider</label>
-                                    <p className="text-base md:text-lg font-semibold text-gray-900">Dr. {doctorInfo.username}</p>
-                                </div>
-                            </div>
-                            <div className="space-y-3 md:space-y-4">
-                                <div>
-                                    <label className="text-xs md:text-sm font-medium text-gray-500">Consultation Type</label>
-                                    <p className="text-base md:text-lg font-semibold text-gray-900">Video Consultation</p>
-                                </div>
-                                <div>
-                                    <label className="text-xs md:text-sm font-medium text-gray-500">Status</label>
-                                    <p className="text-base md:text-lg font-semibold text-green-600">Ready to Connect</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Start Call Button */}
-                    <div className="text-center mb-8 md:mb-16">
-                        <button
-                            onClick={startCall}
-                            className="inline-flex items-center px-6 py-3 md:px-8 md:py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 transform hover:scale-105 shadow-xl text-sm md:text-base"
-                        >
-                            <Video className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3" />
-                            Start Video Consultation
-                        </button>
-                        <p className="text-xs md:text-sm text-gray-500 mt-3 md:mt-4 px-4">
-                            Ensure your camera and microphone are enabled for the best experience
-                        </p>
-                    </div>
-
-                    {/* Features */}
-                    <div className="grid gap-4 md:gap-6 md:grid-cols-3">
-                        <div className="text-center p-4 md:p-6">
-                            <div className="w-12 h-12 md:w-16 md:h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3 md:mb-4">
-                                <Video className="w-6 h-6 md:w-8 md:h-8 text-green-600" />
-                            </div>
-                            <h3 className="font-semibold text-gray-900 mb-2 text-sm md:text-base">HD Video Quality</h3>
-                            <p className="text-gray-600 text-xs md:text-sm">Crystal clear video streaming for accurate consultations</p>
-                        </div>
-
-                        <div className="text-center p-4 md:p-6">
-                            <div className="w-12 h-12 md:w-16 md:h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3 md:mb-4">
-                                <MessageSquare className="w-6 h-6 md:w-8 md:h-8 text-blue-600" />
-                            </div>
-                            <h3 className="font-semibold text-gray-900 mb-2 text-sm md:text-base">Secure Messaging</h3>
-                            <p className="text-gray-600 text-xs md:text-sm">Real-time chat for sharing information during the call</p>
-                        </div>
-
-                        <div className="text-center p-4 md:p-6">
-                            <div className="w-12 h-12 md:w-16 md:h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3 md:mb-4">
-                                <Stethoscope className="w-6 h-6 md:w-8 md:h-8 text-purple-600" />
-                            </div>
-                            <h3 className="font-semibold text-gray-900 mb-2 text-sm md:text-base">Professional Tools</h3>
-                            <p className="text-gray-600 text-xs md:text-sm">Built specifically for healthcare consultations</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
     );
 }
