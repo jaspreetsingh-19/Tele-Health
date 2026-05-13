@@ -1,91 +1,83 @@
-import { MailtrapClient } from "mailtrap";
+import nodemailer from "nodemailer";
 import { mailTemplate, ResetPasswordTemplate, ResetPasswordSuccessTemplate } from "@/lib/mailTemplate";
 
-const TOKEN = process.env.MAILTRAP_TOKEN;
-
-const client = new MailtrapClient({ token: TOKEN });
+const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_APP_PASSWORD,
+    },
+});
 
 const sender = {
-    email: "hello@demomailtrap.co",
-    name: "student buddy",
+    email: process.env.GMAIL_USER,
+    name: "Student Buddy",
 };
 
 export default async function sendVerificationEmail(email, verificationToken) {
-    const recipient = [{ email }];
     try {
         const html = mailTemplate
             .replace("{username}", email)
             .replace("{verificationCode}", verificationToken);
 
-        const response = await client.send({
-            from: sender,
-            to: recipient,
+        const response = await transporter.sendMail({
+            from: `${sender.name} <${sender.email}>`,
+            to: email,
             subject: "Verify Your Email",
             html,
-            category: "Email Verification",
         });
 
         console.log("Email sent successfully:", response);
     } catch (error) {
         console.error("Error sending email:", error);
+        throw new Error("Failed to send verification email");
     }
 }
 
-
 export async function sendWelcomeEmail(email, username) {
-    const recipient = [{ email }];
     try {
-        const response = await client.send({
-            from: sender,
-            to: recipient,
-            template_uuid: "65377d38-11a0-4764-b1f7-902b39e416a8",
-            template_variables: {
-                "company_info_name": "Student Buddy",
-                "name": username
-            }
+        const response = await transporter.sendMail({
+            from: `${sender.name} <${sender.email}>`,
+            to: email,
+            subject: "Welcome to Student Buddy!",
+            html: `<h1>Welcome ${username}!</h1><p>Thanks for joining Student Buddy. We're glad to have you!</p>`,
+        });
 
-        })
         console.log("Welcome email sent successfully:", response);
     } catch (error) {
         console.error("Error sending welcome email:", error);
-
+        throw new Error("Failed to send welcome email");
     }
 }
 
 export async function sendPasswordResetEmail(email, resetUrl) {
-
-    const recipient = [{ email }];
     try {
-        const response = await client.send({
-            from: sender,
-            to: recipient,
+        const response = await transporter.sendMail({
+            from: `${sender.name} <${sender.email}>`,
+            to: email,
             subject: "Reset Your Password",
-            html: ResetPasswordTemplate
+            html: ResetPasswordTemplate.replace("{resetLink}", resetUrl),
+        });
 
-                .replace("{resetLink}", resetUrl),
-            category: "Password Reset",
-
-        })
+        console.log("Password reset email sent successfully:", response);
     } catch (error) {
         console.error("Error sending password reset email:", error);
         throw new Error("Failed to send password reset email");
-
     }
 }
 
 export async function sendPasswordResetEmailSuccess(email) {
-    const recipient = [{ email }];
     try {
-        const response = await client.send({
-            from: sender,
-            to: recipient,
+        const response = await transporter.sendMail({
+            from: `${sender.name} <${sender.email}>`,
+            to: email,
             subject: "Password Reset Successful",
             html: ResetPasswordSuccessTemplate,
-            category: "Password Reset Success",
         });
+
+        console.log("Password reset success email sent:", response);
     } catch (error) {
         console.error("Error sending password reset success email:", error);
         throw new Error("Failed to send password reset success email");
     }
-
 }
