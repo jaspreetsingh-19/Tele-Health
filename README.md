@@ -1,6 +1,6 @@
 # 🏥 TeleHealth — Online Healthcare Consultation Platform
 
-> A full-stack telehealth web application built as a resume showcase project. Connects patients with doctors through real-time video calls and chat, with AI-powered health tools, secure payments, and a complete admin panel.
+> A full-stack telehealth web application built as a showcase project. Connects patients with doctors through real-time video calls and chat, with AI-powered health tools, secure payments, and a complete admin panel.
 
 ---
 
@@ -407,8 +407,8 @@ The Socket.io server acts purely as a **signaling server** — once the WebRTC c
 ## 🙋 Author
 
 **Jaspreet Singh**
-- GitHub: `<!-- add your GitHub profile URL -->`
-- LinkedIn: `<!-- add your LinkedIn URL -->`
+- GitHub: https://github.com/jaspreetsingh-19
+- LinkedIn: https://www.linkedin.com/in/jaspreetsingh1900/
 - Email: jaspreetsingh7192006@gmail.com
 
 ---
